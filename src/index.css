@@ -1,0 +1,630 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    color-scheme: light;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #0b101b;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .font-mono-tabular {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom subtle scrollbars for the reading viewport and drawers */
+.pg-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.pg-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pg-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+}
+
+.pg-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+.kbd-pill {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.16);
+  color: inherit;
+}
+
+/* ==========================================================================
+   MODE 1: ORIGINAL APPLE CLEAR LIQUID GLASS (`[data-layout="fullLiquidGlass"]`)
+   - Pure optical translucency (Glass.clear / NSGlassEffectView)
+   - ZERO outline lines, ZERO inset rim borders disrupting the glass effect
+   - Clean Light Theme & Dark Theme switching
+   ========================================================================== */
+
+[data-layout='fullLiquidGlass'] *,
+[data-layout='fullLiquidGlass'] *::before,
+[data-layout='fullLiquidGlass'] *::after {
+  border-color: transparent !important;
+}
+
+/* --- Root Shells & Modals (Light Clear Liquid Glass) --- */
+[data-layout='fullLiquidGlass'][data-theme='light'] .liquid-glass-shell {
+  background: linear-gradient(
+    165deg,
+    rgba(248, 251, 255, 0.82) 0%,
+    rgba(240, 246, 255, 0.76) 100%
+  );
+  backdrop-filter: url(#apple-tahoe-window-lens) blur(42px) saturate(200%) brightness(1.12);
+  -webkit-backdrop-filter: url(#apple-tahoe-window-lens) blur(42px) saturate(200%) brightness(1.12);
+  border: none !important;
+  color: #0b0f19;
+  box-shadow:
+    0 24px 60px rgba(8, 15, 30, 0.24),
+    0 4px 14px rgba(8, 15, 30, 0.08);
+}
+
+/* --- Root Shells & Modals (Dark Clear Liquid Glass) --- */
+[data-layout='fullLiquidGlass'][data-theme='dark'] .liquid-glass-shell,
+[data-layout='fullLiquidGlass'] .liquid-glass-shell-dark {
+  background: linear-gradient(
+    165deg,
+    rgba(16, 23, 36, 0.72) 0%,
+    rgba(11, 16, 28, 0.64) 100%
+  );
+  backdrop-filter: url(#apple-tahoe-window-lens) blur(42px) saturate(210%) brightness(1.04);
+  -webkit-backdrop-filter: url(#apple-tahoe-window-lens) blur(42px) saturate(210%) brightness(1.04);
+  border: none !important;
+  color: #f8fafc;
+  box-shadow:
+    0 26px 64px rgba(0, 0, 0, 0.52),
+    0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+/* --- Popovers & Floating Menus (Light Clear Liquid Glass) --- */
+[data-layout='fullLiquidGlass'][data-theme='light'] .liquid-glass-Popover {
+  background: linear-gradient(
+    165deg,
+    rgba(250, 252, 255, 0.86) 0%,
+    rgba(242, 247, 255, 0.78) 100%
+  );
+  backdrop-filter: url(#apple-tahoe-window-lens) blur(40px) saturate(205%) brightness(1.12);
+  -webkit-backdrop-filter: url(#apple-tahoe-window-lens) blur(40px) saturate(205%) brightness(1.12);
+  border: none !important;
+  color: #0b0f19;
+  box-shadow:
+    0 20px 50px rgba(8, 15, 30, 0.22),
+    0 2px 10px rgba(8, 15, 30, 0.08);
+}
+
+/* --- Popovers & Floating Menus (Dark Clear Liquid Glass) --- */
+[data-layout='fullLiquidGlass'][data-theme='dark'] .liquid-glass-Popover,
+[data-layout='fullLiquidGlass'] .liquid-glass-Popover-dark {
+  background: linear-gradient(
+    165deg,
+    rgba(18, 25, 40, 0.76) 0%,
+    rgba(12, 17, 28, 0.68) 100%
+  );
+  backdrop-filter: url(#apple-tahoe-window-lens) blur(40px) saturate(215%) brightness(1.04);
+  -webkit-backdrop-filter: url(#apple-tahoe-window-lens) blur(40px) saturate(215%) brightness(1.04);
+  border: none !important;
+  color: #f8fafc;
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.56),
+    0 2px 10px rgba(0, 0, 0, 0.30);
+}
+
+/* --- Borderless Clear Liquid Glass Buttons (`.buttonStyle(.glass)`) --- */
+[data-layout='fullLiquidGlass'] .apple-glass-btn {
+  position: relative;
+  border-radius: 9999px;
+  border: none !important;
+  background: rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(14px) saturate(190%);
+  -webkit-backdrop-filter: blur(14px) saturate(190%);
+  color: #0f172a;
+  box-shadow: none;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.16s ease;
+}
+
+[data-layout='fullLiquidGlass'] .apple-glass-btn:hover {
+  transform: scale(1.02);
+  background: rgba(15, 23, 42, 0.11);
+}
+
+[data-layout='fullLiquidGlass'][data-theme='dark'] .apple-glass-btn,
+[data-layout='fullLiquidGlass'] .apple-glass-btn-dark {
+  position: relative;
+  border-radius: 9999px;
+  border: none !important;
+  background: rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(14px) saturate(190%);
+  -webkit-backdrop-filter: blur(14px) saturate(190%);
+  color: #f1f5f9;
+  box-shadow: none;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.16s ease;
+}
+
+[data-layout='fullLiquidGlass'][data-theme='dark'] .apple-glass-btn:hover,
+[data-layout='fullLiquidGlass'] .apple-glass-btn-dark:hover {
+  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* --- Borderless Prominent Clear Liquid Glass Button (`.buttonStyle(.glassProminent)`) --- */
+[data-layout='fullLiquidGlass'] .apple-glass-btn-prominent {
+  position: relative;
+  border-radius: 9999px;
+  border: none !important;
+  color: #ffffff !important;
+  background: linear-gradient(
+    180deg,
+    rgba(37, 118, 252, 0.86) 0%,
+    rgba(24, 88, 224, 0.80) 100%
+  );
+  backdrop-filter: blur(16px) saturate(210%);
+  -webkit-backdrop-filter: blur(16px) saturate(210%);
+  box-shadow: 0 4px 12px rgba(24, 92, 230, 0.24);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.16s ease;
+}
+
+[data-layout='fullLiquidGlass'] .apple-glass-btn-prominent:hover {
+  transform: scale(1.02);
+  background: linear-gradient(
+    180deg,
+    rgba(48, 128, 255, 0.92) 0%,
+    rgba(28, 96, 236, 0.86) 100%
+  );
+}
+
+[data-layout='fullLiquidGlass'] .apple-glass-btn:active,
+[data-layout='fullLiquidGlass'] .apple-glass-btn-dark:active,
+[data-layout='fullLiquidGlass'] .apple-glass-btn-prominent:active {
+  transform: scale(0.97);
+}
+
+/* --- Borderless Clear Liquid Glass Cards & Inputs --- */
+[data-layout='fullLiquidGlass'] .apple-glass-card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(18px) saturate(190%);
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  border: none !important;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+[data-layout='fullLiquidGlass'][data-theme='dark'] .apple-glass-card,
+[data-layout='fullLiquidGlass'] .apple-glass-card-dark {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px) saturate(190%);
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  border: none !important;
+  color: #f1f5f9;
+  box-shadow: none;
+}
+
+[data-layout='fullLiquidGlass'] .apple-glass-segmented {
+  padding: 3px;
+  border-radius: 9999px;
+  border: none !important;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+[data-layout='fullLiquidGlass'][data-theme='dark'] .apple-glass-segmented {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* --- Borderless Clear Liquid Glass Slider (`input[type="range"]`) ---
+   At rest: crisp white capsule thumb.
+   While dragging (`:active` / `.is-dragging`): inflates and transforms into translucent
+   macOS Tahoe refractive Liquid Glass so the track refracts through the thumb! */
+[data-layout='fullLiquidGlass'] input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    rgba(37, 99, 235, 0.45) 0%,
+    rgba(56, 189, 248, 0.32) 50%,
+    rgba(15, 23, 42, 0.14) 100%
+  );
+  border: none !important;
+  box-shadow: none;
+  cursor: pointer;
+  outline: none;
+  transition: height 0.18s cubic-bezier(0.22, 1, 0.36, 1), background 0.18s ease;
+}
+
+[data-layout='fullLiquidGlass'][data-theme='dark'] input[type='range'] {
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.52) 0%,
+    rgba(37, 99, 235, 0.35) 55%,
+    rgba(255, 255, 255, 0.16) 100%
+  );
+}
+
+[data-layout='fullLiquidGlass'] input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 15px;
+  border-radius: 9999px;
+  border: none !important;
+  background: #ffffff;
+  box-shadow:
+    0 2px 7px rgba(15, 23, 42, 0.28),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  cursor: grab;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1.35, 0.36, 1),
+    background 0.18s ease,
+    box-shadow 0.22s ease,
+    backdrop-filter 0.18s ease;
+}
+
+[data-layout='fullLiquidGlass'] input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.14, 1.1);
+}
+
+/* macOS Tahoe Slider Drag -> Turns into Translucent Refractive Liquid Glass Capsule */
+[data-layout='fullLiquidGlass'] input[type='range']:active::-webkit-slider-thumb,
+[data-layout='fullLiquidGlass'] input[type='range'].is-dragging::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.44, 1.34);
+  background: radial-gradient(
+    120% 120% at 30% 20%,
+    rgba(255, 255, 255, 0.38) 0%,
+    rgba(186, 230, 253, 0.16) 48%,
+    rgba(255, 255, 255, 0.08) 72%,
+    rgba(255, 255, 255, 0.28) 100%
+  ) !important;
+  backdrop-filter: url(#apple-tahoe-button-lens) blur(6px) saturate(220%) brightness(1.18);
+  -webkit-backdrop-filter: url(#apple-tahoe-button-lens) blur(6px) saturate(220%) brightness(1.18);
+  box-shadow:
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.92),
+    inset 0 -1.5px 2.5px rgba(56, 189, 248, 0.55),
+    inset 1px 0 2px rgba(255, 255, 255, 0.65),
+    0 6px 18px rgba(8, 15, 30, 0.34),
+    0 0 12px rgba(56, 189, 248, 0.32) !important;
+}
+
+[data-layout='fullLiquidGlass'] input[type='range']::-moz-range-thumb {
+  width: 22px;
+  height: 15px;
+  border-radius: 9999px;
+  border: none !important;
+  background: #ffffff;
+  box-shadow:
+    0 2px 7px rgba(15, 23, 42, 0.28),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  cursor: grab;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1.35, 0.36, 1),
+    background 0.18s ease,
+    box-shadow 0.22s ease;
+}
+
+[data-layout='fullLiquidGlass'] input[type='range']:active::-moz-range-thumb,
+[data-layout='fullLiquidGlass'] input[type='range'].is-dragging::-moz-range-thumb {
+  cursor: grabbing;
+  transform: scale(1.44, 1.34);
+  background: radial-gradient(
+    120% 120% at 30% 20%,
+    rgba(255, 255, 255, 0.38) 0%,
+    rgba(186, 230, 253, 0.16) 48%,
+    rgba(255, 255, 255, 0.08) 72%,
+    rgba(255, 255, 255, 0.28) 100%
+  ) !important;
+  backdrop-filter: blur(6px) saturate(220%) brightness(1.18);
+  box-shadow:
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.92),
+    inset 0 -1.5px 2.5px rgba(56, 189, 248, 0.55),
+    0 6px 18px rgba(8, 15, 30, 0.34) !important;
+}
+
+/* --- macOS Tahoe Liquid Glass Morphing Animations for Window & Top-Right Collapse/Expand Button --- */
+@keyframes tahoe-liquid-window-expand {
+  0% {
+    opacity: 0.35;
+    transform: translate3d(14px, -16px, 0) scale(0.84, 0.76);
+    filter: blur(8px);
+  }
+  58% {
+    opacity: 1;
+    transform: translate3d(-2px, 2px, 0) scale(1.018, 1.022);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes tahoe-liquid-bubble-condense {
+  0% {
+    opacity: 0.35;
+    transform: scale(1.85, 1.45);
+    filter: blur(6px);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(0.9, 1.1);
+    filter: blur(0px);
+  }
+  82% {
+    transform: scale(1.06, 0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1, 1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes tahoe-corner-droplet-morph {
+  0% {
+    transform: scale(0.68) rotate(-18deg);
+  }
+  50% {
+    transform: scale(1.26, 0.86) rotate(8deg);
+  }
+  78% {
+    transform: scale(0.94, 1.08) rotate(-3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+[data-layout='fullLiquidGlass'] .liquid-window-morph {
+  animation: tahoe-liquid-window-expand 0.42s cubic-bezier(0.22, 1.32, 0.36, 1) both;
+  transform-origin: top right;
+}
+
+[data-layout='fullLiquidGlass'] .liquid-bubble-morph {
+  animation: tahoe-liquid-bubble-condense 0.44s cubic-bezier(0.22, 1.38, 0.36, 1) both;
+  transform-origin: center center;
+}
+
+[data-layout='fullLiquidGlass'] .liquid-corner-morph-btn {
+  position: relative;
+  overflow: hidden;
+  animation: tahoe-corner-droplet-morph 0.48s cubic-bezier(0.22, 1.36, 0.36, 1) both;
+  transition:
+    transform 0.26s cubic-bezier(0.22, 1.4, 0.36, 1),
+    background 0.2s ease,
+    box-shadow 0.22s ease;
+}
+
+[data-layout='fullLiquidGlass'] .liquid-corner-morph-btn:hover {
+  transform: scale(1.18, 1.12);
+  background: radial-gradient(
+    120% 120% at 30% 25%,
+    rgba(255, 255, 255, 0.32) 0%,
+    rgba(56, 189, 248, 0.22) 60%,
+    rgba(255, 255, 255, 0.14) 100%
+  ) !important;
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.8),
+    0 4px 12px rgba(56, 189, 248, 0.25);
+}
+
+[data-layout='fullLiquidGlass'] .liquid-corner-morph-btn:active {
+  transform: scale(1.34, 0.84);
+}
+
+
+/* ==========================================================================
+   MODE 2: CLASSIC CARD UI (`[data-layout="classicCard"]`)
+   - ZERO Liquid Glass anywhere (no blur, no refraction, no liquid pill inflation)
+   - Clean, flat, traditional desktop card & button styling
+   ========================================================================== */
+
+[data-layout='classicCard'][data-theme='light'] .liquid-glass-shell,
+[data-layout='classicCard'][data-theme='light'] .liquid-glass-Popover {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14) !important;
+}
+
+[data-layout='classicCard'][data-theme='dark'] .liquid-glass-shell,
+[data-layout='classicCard'][data-theme='dark'] .liquid-glass-Popover,
+[data-layout='classicCard'] .liquid-glass-shell-dark,
+[data-layout='classicCard'] .liquid-glass-Popover-dark {
+  background: #141a26 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid #263147 !important;
+  color: #f8fafc;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.50) !important;
+}
+
+[data-layout='classicCard'] .apple-glass-btn {
+  border-radius: 8px;
+  border: 1px solid #d8e0ea;
+  background: #f1f5f9;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #1e293b;
+  box-shadow: none !important;
+  transition: background-color 0.12s ease;
+}
+
+[data-layout='classicCard'] .apple-glass-btn:hover {
+  background: #e2e8f0;
+}
+
+[data-layout='classicCard'][data-theme='dark'] .apple-glass-btn,
+[data-layout='classicCard'] .apple-glass-btn-dark {
+  border-radius: 8px;
+  border: 1px solid #2b374f;
+  background: #1d2638;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #e2e8f0;
+  box-shadow: none !important;
+  transition: background-color 0.12s ease;
+}
+
+[data-layout='classicCard'][data-theme='dark'] .apple-glass-btn:hover,
+[data-layout='classicCard'] .apple-glass-btn-dark:hover {
+  background: #28344b;
+}
+
+[data-layout='classicCard'] .apple-glass-btn-prominent {
+  border-radius: 8px;
+  border: 1px solid #1d4ed8;
+  background: #2563eb;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  transition: background-color 0.12s ease;
+}
+
+[data-layout='classicCard'] .apple-glass-btn-prominent:hover {
+  background: #1d4ed8;
+}
+
+[data-layout='classicCard'] .apple-glass-card {
+  border-radius: 10px;
+  background: #f8fafc;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  box-shadow: none !important;
+}
+
+[data-layout='classicCard'][data-theme='dark'] .apple-glass-card,
+[data-layout='classicCard'] .apple-glass-card-dark {
+  border-radius: 10px;
+  background: #161e2e;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid #263147;
+  color: #f1f5f9;
+  box-shadow: none !important;
+}
+
+[data-layout='classicCard'] .apple-glass-segmented {
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  backdrop-filter: none !important;
+}
+
+[data-layout='classicCard'][data-theme='dark'] .apple-glass-segmented {
+  border: 1px solid #263147;
+  background: #111622;
+}
+
+/* --- Classic Simple Range Slider (No Liquid Glass) --- */
+[data-layout='classicCard'] input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
+  background: #cbd5e1;
+  outline: none;
+  cursor: pointer;
+}
+
+[data-layout='classicCard'][data-theme='dark'] input[type='range'] {
+  background: #334155;
+}
+
+[data-layout='classicCard'] input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+[data-layout='classicCard'] input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   CLEAN DARK THEME TEXT & SURFACE OVERRIDES FOR MODALS AND POPOVERS
+   Ensures switching between Light and Dark theme updates all modals cleanly
+   ========================================================================== */
+
+[data-theme='dark'] .liquid-glass-shell .text-slate-900,
+[data-theme='dark'] .liquid-glass-shell .text-\[\#11141C\],
+[data-theme='dark'] .liquid-glass-Popover .text-slate-900,
+[data-theme='dark'] .liquid-glass-Popover .text-\[\#11141C\] {
+  color: #f8fafc !important;
+}
+
+[data-theme='dark'] .liquid-glass-shell .text-slate-800,
+[data-theme='dark'] .liquid-glass-shell .text-slate-700,
+[data-theme='dark'] .liquid-glass-Popover .text-slate-800,
+[data-theme='dark'] .liquid-glass-Popover .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+[data-theme='dark'] .liquid-glass-shell .text-slate-600,
+[data-theme='dark'] .liquid-glass-shell .text-slate-500,
+[data-theme='dark'] .liquid-glass-Popover .text-slate-600,
+[data-theme='dark'] .liquid-glass-Popover .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+[data-theme='dark'] .liquid-glass-shell .bg-white\/45,
+[data-theme='dark'] .liquid-glass-shell .bg-white\/40,
+[data-theme='dark'] .liquid-glass-shell .bg-white\/35,
+[data-theme='dark'] .liquid-glass-shell .bg-white\/30,
+[data-theme='dark'] .liquid-glass-shell .bg-white\/25,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/45,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/40,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/35,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/30,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/25 {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+}
+
+[data-theme='dark'] .liquid-glass-shell .bg-white\/70,
+[data-theme='dark'] .liquid-glass-shell .bg-white\/65,
+[data-theme='dark'] .liquid-glass-shell .bg-white\/55,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/70,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/65,
+[data-theme='dark'] .liquid-glass-Popover .bg-white\/55 {
+  background-color: rgba(30, 41, 59, 0.55) !important;
+  color: #f1f5f9 !important;
+}
