@@ -209,16 +209,32 @@ cat > "${APP_BUNDLE}/Contents/Info.plist" << 'EOF'
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Pathfinder Glass uses the microphone for live Siri Dictation Voice Auto-Follow so your script advances hands-free as you speak.</string>
+  <string>Pathfinder Glass uses your active macOS system audio input (microphone or loopback audio device) for live Siri Dictation Voice Auto-Follow so your script advances hands-free as you speak.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>Pathfinder Glass uses on-device speech recognition to track spoken words in order and automatically advance to the next script line.</string>
 </dict>
 </plist>
 EOF
 
-echo "==> [5/5] Applying ad-hoc code signature for local Apple Silicon execution..."
-codesign --force --deep --sign - "${APP_BUNDLE}"
+ENTITLEMENTS_PLIST="${DIST_DIR}/Entitlements.plist"
+cat > "${ENTITLEMENTS_PLIST}" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+  <key>com.apple.security.device.microphone</key>
+  <true/>
+</dict>
+</plist>
+EOF
+
+echo "==> [5/5] Applying ad-hoc code signature with System Audio Input entitlements..."
+codesign --force --deep --entitlements "${ENTITLEMENTS_PLIST}" --sign - "${APP_BUNDLE}"
+rm -f "${ENTITLEMENTS_PLIST}"
 codesign --verify --verbose=2 "${APP_BUNDLE}"
 
-echo "SUCCESS: Built '${APP_BUNDLE}' (with embedded AppIcon.icns)"
+echo "SUCCESS: Built '${APP_BUNDLE}' (with embedded AppIcon.icns and System Audio Input entitlements)"
+
 

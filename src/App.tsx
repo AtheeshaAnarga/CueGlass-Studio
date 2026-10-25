@@ -403,9 +403,75 @@ export default function App() {
   const [spokenWordCount, setSpokenWordCount] = useState<number>(0);
   const [lastMatchedVoiceWord, setLastMatchedVoiceWord] = useState<string>('');
   const [voiceMicStatus, setVoiceMicStatus] = useState<'idle' | 'listening' | 'permission-denied'>('idle');
+  const [audioInputDevices, setAudioInputDevices] = useState<
+    Array<{ deviceId: string; label: string }>
+  >([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string>(
+    () => {
+      const saved =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem('cg.selectedAudioDeviceId')
+          : null;
+      return saved || 'default';
+    }
+  );
+  const [voiceAudioLevel, setVoiceAudioLevel] = useState<number>(0);
   const pendingJumpWordCountRef = useRef<number>(0);
   const spokenWordCountRef = useRef<number>(0);
   spokenWordCountRef.current = spokenWordCount;
+
+  const refreshAudioDevices = useCallback(async () => {
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices ||
+      !navigator.mediaDevices.enumerateDevices
+    ) {
+      return;
+    }
+    try {
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = allDevices
+        .filter((d) => d.kind === 'audioinput')
+        .map((d, idx) => ({
+          deviceId: d.deviceId || `input-${idx}`,
+          label: d.label || `System Audio Input ${idx + 1}`,
+        }));
+      setAudioInputDevices(inputs);
+    } catch {
+      // ignore enumeration errors
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAudioDevices();
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.mediaDevices &&
+      navigator.mediaDevices.addEventListener
+    ) {
+      navigator.mediaDevices.addEventListener(
+        'devicechange',
+        refreshAudioDevices
+      );
+      return () => {
+        navigator.mediaDevices.removeEventListener(
+          'devicechange',
+          refreshAudioDevices
+        );
+      };
+    }
+  }, [refreshAudioDevices]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'cg.selectedAudioDeviceId',
+        selectedAudioDeviceId
+      );
+    } catch {
+      // ignore
+    }
+  }, [selectedAudioDeviceId]);
 
   // Tracks how many words in the current continuous Web Speech API result stream belonged to prior beats
   // so continuous sentences across beat boundaries never bleed old words into the newly selected beat.
@@ -509,19 +575,109 @@ export default function App() {
     };
   }, [processLiveSpeechTranscript]);
 
-  // Built-in macOS Siri Dictation / Web Speech API — Strictly Speech-Driven (Zero Timer Auto-Scroll)
+  // Built-in macOS Siri Dictation / Web Speech API + System Audio Input Stream — Strictly Speech-Driven
   useEffect(() => {
     if (!isVoiceListening) {
       setVoiceMicStatus('idle');
       setLastMatchedVoiceWord('');
+      setVoiceAudioLevel(0);
       return;
     }
 
     let isCancelled = false;
     let restartTimer: number | null = null;
+    let levelRafId: number | null = null;
+    let mediaStream: MediaStream | null = null;
+    let audioCtx: AudioContext | null = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let recognition: any = null;
 
+    // 1. Acquire System Audio Input Stream & Live Level Meter (ensures macOS/browser audio route is active)
+    const startSystemAudioStream = async () => {
+      if (
+        typeof navigator === 'undefined' ||
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        return;
+      }
+      try {
+        const audioConstraints: MediaTrackConstraints =
+          selectedAudioDeviceId && selectedAudioDeviceId !== 'default'
+            ? {
+                deviceId: { ideal: selectedAudioDeviceId },
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              }
+            : {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              };
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraints,
+          video: false,
+        });
+
+        if (isCancelled) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        setVoiceMicStatus('listening');
+        refreshAudioDevices();
+
+        const AudioContextCtor =
+          window.AudioContext ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).webkitAudioContext;
+        if (AudioContextCtor) {
+          audioCtx = new AudioContextCtor();
+          const source = audioCtx.createMediaStreamSource(mediaStream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 256;
+          analyser.smoothingTimeConstant = 0.65;
+          source.connect(analyser);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          let lastSampleTime = 0;
+
+          const sampleLevel = (now: number) => {
+            if (isCancelled) return;
+            if (now - lastSampleTime >= 65) {
+              lastSampleTime = now;
+              analyser.getByteTimeDomainData(dataArray);
+              let sumSquares = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                const normalized = (dataArray[i] - 128) / 128;
+                sumSquares += normalized * normalized;
+              }
+              const rms = Math.sqrt(sumSquares / dataArray.length);
+              const scaled = Math.min(100, Math.round(rms * 340));
+              setVoiceAudioLevel(scaled);
+            }
+            levelRafId = window.requestAnimationFrame(sampleLevel);
+          };
+
+          levelRafId = window.requestAnimationFrame(sampleLevel);
+        }
+      } catch (err) {
+        if (isCancelled) return;
+        const errName = (err as { name?: string })?.name || '';
+        if (
+          errName === 'NotAllowedError' ||
+          errName === 'PermissionDeniedError'
+        ) {
+          setVoiceMicStatus('permission-denied');
+        }
+      }
+    };
+
+    startSystemAudioStream();
+
+    // 2. Start Continuous Speech Recognition on the active system audio input
     const SpeechRecognitionCtor =
       typeof window !== 'undefined'
         ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -660,6 +816,15 @@ export default function App() {
       if (restartTimer !== null) {
         window.clearTimeout(restartTimer);
       }
+      if (levelRafId !== null) {
+        window.cancelAnimationFrame(levelRafId);
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+      }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+      }
       if (recognition) {
         try {
           recognition.onend = null;
@@ -671,7 +836,12 @@ export default function App() {
         }
       }
     };
-  }, [isVoiceListening, processLiveSpeechTranscript]);
+  }, [
+    isVoiceListening,
+    selectedAudioDeviceId,
+    processLiveSpeechTranscript,
+    refreshAudioDevices,
+  ]);
 
   const handleQuickCopyAIPrompt = async () => {
     try {
@@ -3172,6 +3342,9 @@ export default function App() {
           voiceDarkenWords={voiceDarkenWords}
           voiceDarkenOpacity={voiceDarkenOpacity}
           voiceShowTargetUnderline={voiceShowTargetUnderline}
+          audioInputDevices={audioInputDevices}
+          selectedAudioDeviceId={selectedAudioDeviceId}
+          voiceAudioLevel={voiceAudioLevel}
           onChangeThemeMode={setThemeMode}
           onChangeWindowLayoutMode={setWindowLayoutMode}
           onChangeGlassVariant={setGlassVariant}
@@ -3195,6 +3368,8 @@ export default function App() {
           onToggleVoiceShowTargetUnderline={() =>
             setVoiceShowTargetUnderline((v) => !v)
           }
+          onChangeSelectedAudioDeviceId={setSelectedAudioDeviceId}
+          onRefreshAudioDevices={refreshAudioDevices}
           onApplyPreset={(preset) => {
             setThemeMode(preset.themeMode);
             setWindowLayoutMode(preset.windowLayoutMode);

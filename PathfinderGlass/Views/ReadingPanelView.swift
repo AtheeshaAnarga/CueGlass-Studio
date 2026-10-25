@@ -348,6 +348,7 @@ public struct ReadingPanelView: View {
     @ObservedObject public var coordinator: AppCoordinator
     @ObservedObject private var navigation: ScriptNavigationController
     @ObservedObject private var settings: SettingsStore
+    @ObservedObject private var voiceFollow: VoiceAutoFollowController
     @Namespace private var glassMorphNamespace
     @State private var isHoveringBottomControls: Bool = false
     @State private var copiedAIPromptFeedback: Bool = false
@@ -356,6 +357,7 @@ public struct ReadingPanelView: View {
         self.coordinator = coordinator
         self.navigation = coordinator.navigation
         self.settings = coordinator.settings
+        self.voiceFollow = coordinator.voiceFollow
     }
 
     private var isDark: Bool {
@@ -411,19 +413,7 @@ public struct ReadingPanelView: View {
 
     private var microHeaderBar: some View {
         HStack(spacing: 7) {
-            Text(navigation.document.metadata.title)
-                .font(.system(size: 11, weight: .bold, design: .default))
-                .tracking(0.5)
-                .lineLimit(1)
-                .foregroundColor(
-                    isDark
-                        ? Color(red: 0.72, green: 0.80, blue: 0.92)
-                        : Color(red: 0.20, green: 0.24, blue: 0.30)
-                )
-
             if let section = navigation.activeSection {
-                Text("·")
-                    .foregroundColor(.secondary)
                 Text("\(section.numberBadge) — \(section.shortTitle)")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(
@@ -439,12 +429,8 @@ public struct ReadingPanelView: View {
             Button {
                 copyAIMasterPromptToPasteboard()
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: copiedAIPromptFeedback ? "checkmark.circle.fill" : "sparkles")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(copiedAIPromptFeedback ? "Copied AI Prompt!" : "AI Prompt")
-                        .font(.system(size: 10.5, weight: .semibold))
-                }
+                Image(systemName: copiedAIPromptFeedback ? "checkmark.circle.fill" : "sparkles")
+                    .font(.system(size: 11.5, weight: .semibold))
             }
             .appleLiquidGlassButton(
                 prominent: copiedAIPromptFeedback,
@@ -566,6 +552,18 @@ public struct ReadingPanelView: View {
                 .controlSize(.small)
 
                 if isFullLiquid {
+                    HStack(spacing: 6) {
+                        Button("Apple Clear Glass") {
+                            settings.resetToAppleLiquidGlassLight()
+                        }
+                        .appleLiquidGlassButton(prominent: false, isDark: isDark, isFullLiquid: isFullLiquid)
+
+                        Button("Tahoe Dark Glass") {
+                            settings.applyTahoeDarkGlassPreset()
+                        }
+                        .appleLiquidGlassButton(prominent: false, isDark: isDark, isFullLiquid: isFullLiquid)
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("APPLE LIQUID GLASS VARIANT")
                             .font(.system(size: 9.5, weight: .bold))
@@ -606,6 +604,11 @@ public struct ReadingPanelView: View {
                         )
                     }
                 }
+
+                Toggle("Voice Follow: Darken Spoken Words", isOn: $settings.voiceDarkenWords)
+                    .font(.system(size: 11, weight: .semibold))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
 
                 HStack {
                     Text("Font: \(Int(settings.fontSize))pt · \(settings.fontWeightOption.displayName)")
@@ -899,18 +902,28 @@ public struct ReadingPanelView: View {
                 case .divider:
                     Divider().padding(.vertical, 4)
                 default:
-                    Text(Self.attributedBeatText(from: block.rawMarkdown, isActive: isActive))
-                        .font(.system(size: settings.fontSize, weight: settings.fontWeightOption.swiftUIWeight))
-                        .lineSpacing(CGFloat(settings.fontSize * (settings.lineHeightMultiplier - 1.0)))
-                        .foregroundColor(
-                            isActive
-                                ? (isDark
-                                    ? Color(red: 0.98, green: 0.99, blue: 1.0)
-                                    : Color(red: 0.04, green: 0.06, blue: 0.09))
-                                : (isDark
-                                    ? Color(red: 0.62, green: 0.67, blue: 0.76)
-                                    : Color(red: 0.28, green: 0.32, blue: 0.40))
+                    let baseColor: Color = isActive
+                        ? (isDark
+                            ? Color(red: 0.98, green: 0.99, blue: 1.0)
+                            : Color(red: 0.04, green: 0.06, blue: 0.09))
+                        : (isDark
+                            ? Color(red: 0.62, green: 0.67, blue: 0.76)
+                            : Color(red: 0.28, green: 0.32, blue: 0.40))
+                    let activeSpokenWords = (isActive && voiceFollow.isListening && settings.voiceDarkenWords)
+                        ? voiceFollow.spokenWordCount
+                        : 0
+                    Text(
+                        Self.attributedBeatText(
+                            from: block.rawMarkdown,
+                            isActive: isActive,
+                            baseColor: baseColor,
+                            spokenWordCount: activeSpokenWords,
+                            darkenOpacity: settings.voiceDarkenOpacity / 100.0
                         )
+                    )
+                    .font(.system(size: settings.fontSize, weight: settings.fontWeightOption.swiftUIWeight))
+                    .lineSpacing(CGFloat(settings.fontSize * (settings.lineHeightMultiplier - 1.0)))
+                    .foregroundColor(baseColor)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -942,7 +955,7 @@ public struct ReadingPanelView: View {
     }
 
     private var bottomControlStrip: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Button {
                 navigation.previousBeat()
             } label: {
@@ -961,10 +974,37 @@ public struct ReadingPanelView: View {
             .appleLiquidGlassButton(prominent: false, isDark: isDark, isFullLiquid: isFullLiquid)
             .help("Next Beat (→ or ⌃⌥→)")
 
+            Button {
+                voiceFollow.toggleListening()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: voiceFollow.isListening ? "stop.fill" : "play.fill")
+                        .font(.system(size: 9.5, weight: .bold))
+                    Text(voiceFollow.isListening ? "Stop Voice" : "Voice Follow")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    if voiceFollow.isListening && voiceFollow.activeBeatWordTotal > 0 {
+                        Text("\(voiceFollow.spokenWordCount)/\(voiceFollow.activeBeatWordTotal)")
+                            .font(.system(size: 10, weight: .medium).monospacedDigit())
+                            .opacity(0.85)
+                    }
+                    Image(systemName: voiceFollow.isListening ? "waveform.circle.fill" : "mic.fill")
+                        .font(.system(size: 10.5))
+                        .opacity(voiceFollow.isListening ? 0.95 : 0.75)
+                }
+            }
+            .appleLiquidGlassButton(
+                prominent: voiceFollow.isListening,
+                isDark: isDark,
+                tint: voiceFollow.isListening ? .green : nil,
+                isFullLiquid: isFullLiquid
+            )
+            .help("Siri Dictation & System Audio Auto-Follow: Tracks spoken words in order and auto-advances lines hands-free")
+
             if let section = navigation.activeSection {
                 Text("\(section.shortTitle) · Beat \(navigation.activeBeatIndexInSection)/\(max(1, navigation.currentSectionBeats.count))")
-                    .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
-                    .padding(.horizontal, 9)
+                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                    .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .modifier(
                         AppleLiquidGlassSurfaceModifier(
@@ -979,34 +1019,16 @@ public struct ReadingPanelView: View {
                         )
                     )
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
 
-            Spacer()
-
-            if let waypoint = navigation.pendingThankSpeakerWaypoint {
-                Button {
-                    navigation.jumpToThanksInCurrentSection()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "forward.end.fill")
-                            .font(.system(size: 10))
-                        Text("Thanks (\(waypoint.speakerName))")
-                            .font(.system(size: 11.5, weight: .semibold))
-                    }
-                }
-                .appleLiquidGlassButton(prominent: true, isDark: isDark, isFullLiquid: isFullLiquid)
-                .help("Jump directly to THANKING subsection after speaker finishes")
-            }
+            Spacer(minLength: 4)
 
             Button {
                 coordinator.panelController?.positionNearCamera()
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "scope")
-                        .font(.system(size: 10.5, weight: .semibold))
-                    Text("Near Camera")
-                        .font(.system(size: 11, weight: .semibold))
-                }
+                Image(systemName: "scope")
+                    .font(.system(size: 11.5, weight: .semibold))
             }
             .appleLiquidGlassButton(prominent: false, isDark: isDark, isFullLiquid: isFullLiquid)
             .help("Snap panel top-center below camera housing (⌃⌥H)")
@@ -1029,14 +1051,61 @@ public struct ReadingPanelView: View {
         return rawTitle
     }
 
-    private static func attributedBeatText(from markdown: String, isActive: Bool) -> AttributedString {
+    private static func attributedBeatText(
+        from markdown: String,
+        isActive: Bool,
+        baseColor: Color,
+        spokenWordCount: Int = 0,
+        darkenOpacity: Double = 0.35
+    ) -> AttributedString {
         let cleaned = markdown
             .replacingOccurrences(of: "==", with: "")
             .replacingOccurrences(of: "[PAUSE]", with: " ⏸ ")
             .replacingOccurrences(of: "[BEAT]", with: " ⏸ ")
-        if let parsed = try? AttributedString(markdown: cleaned) {
-            return parsed
+            .replacingOccurrences(of: "[BREATHE]", with: " ⏸ ")
+
+        guard isActive && spokenWordCount > 0 else {
+            if let parsed = try? AttributedString(markdown: cleaned) {
+                return parsed
+            }
+            return AttributedString(cleaned)
         }
-        return AttributedString(cleaned)
+
+        // Tokenize preserving whitespace so already-spoken words dim cleanly to darkenOpacity
+        let plainText: String
+        if let parsed = try? AttributedString(markdown: cleaned) {
+            plainText = String(parsed.characters)
+        } else {
+            plainText = cleaned
+        }
+
+        var result = AttributedString()
+        var spokenIndex = 0
+        let scanner = Scanner(string: plainText)
+        scanner.charactersToBeSkipped = nil
+
+        while !scanner.isAtEnd {
+            if let ws = scanner.scanCharacters(from: .whitespacesAndNewlines), !ws.isEmpty {
+                var wsAttr = AttributedString(ws)
+                wsAttr.foregroundColor = baseColor.opacity(spokenIndex < spokenWordCount ? darkenOpacity : 1.0)
+                result.append(wsAttr)
+            }
+            if let word = scanner.scanUpToCharacters(from: .whitespacesAndNewlines), !word.isEmpty {
+                let hasAlnum = word.unicodeScalars.contains { CharacterSet.alphanumerics.contains($0) }
+                var wordAttr = AttributedString(word)
+                if hasAlnum {
+                    if spokenIndex < spokenWordCount {
+                        wordAttr.foregroundColor = baseColor.opacity(darkenOpacity)
+                    } else {
+                        wordAttr.foregroundColor = baseColor
+                    }
+                    spokenIndex += 1
+                } else {
+                    wordAttr.foregroundColor = baseColor.opacity(spokenIndex <= spokenWordCount ? darkenOpacity : 1.0)
+                }
+                result.append(wordAttr)
+            }
+        }
+        return result
     }
 }

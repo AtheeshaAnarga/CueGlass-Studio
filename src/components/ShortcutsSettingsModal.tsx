@@ -42,6 +42,9 @@ interface ShortcutsSettingsModalProps {
   voiceDarkenWords: boolean;
   voiceDarkenOpacity: number;
   voiceShowTargetUnderline: boolean;
+  audioInputDevices: Array<{ deviceId: string; label: string }>;
+  selectedAudioDeviceId: string;
+  voiceAudioLevel: number;
   onChangeThemeMode: (mode: 'light' | 'dark') => void;
   onChangeWindowLayoutMode: (mode: WindowLayoutMode) => void;
   onChangeGlassVariant: (variant: AppleGlassVariant) => void;
@@ -63,6 +66,8 @@ interface ShortcutsSettingsModalProps {
   onChangeVoiceDarkenWords: (darken: boolean) => void;
   onChangeVoiceDarkenOpacity: (opacity: number) => void;
   onToggleVoiceShowTargetUnderline: () => void;
+  onChangeSelectedAudioDeviceId: (deviceId: string) => void;
+  onRefreshAudioDevices: () => void;
   onApplyPreset: (preset: {
     themeMode: 'light' | 'dark';
     windowLayoutMode: WindowLayoutMode;
@@ -143,6 +148,9 @@ export const ShortcutsSettingsModal: React.FC<ShortcutsSettingsModalProps> = ({
   voiceDarkenWords,
   voiceDarkenOpacity,
   voiceShowTargetUnderline,
+  audioInputDevices,
+  selectedAudioDeviceId,
+  voiceAudioLevel,
   onChangeThemeMode,
   onChangeWindowLayoutMode,
   onChangeGlassVariant,
@@ -164,6 +172,8 @@ export const ShortcutsSettingsModal: React.FC<ShortcutsSettingsModalProps> = ({
   onChangeVoiceDarkenWords,
   onChangeVoiceDarkenOpacity,
   onToggleVoiceShowTargetUnderline,
+  onChangeSelectedAudioDeviceId,
+  onRefreshAudioDevices,
   onApplyPreset,
   onClose,
 }) => {
@@ -638,12 +648,12 @@ export const ShortcutsSettingsModal: React.FC<ShortcutsSettingsModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Auto Voice Follow & Spoken Word Darkening Settings (Replaces Spacing Slider) */}
+                  {/* Auto Voice Follow, System Audio Input & Spoken Word Darkening Settings */}
                   <div className="p-3.5 rounded-2xl apple-glass-card space-y-3 sm:col-span-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
                         <Mic className="w-3.5 h-3.5 text-[#2363D9]" />
-                        <span>Auto Voice Follow &amp; Spoken Word Darkening</span>
+                        <span>Auto Voice Follow · System Audio Input &amp; Word Darkening</span>
                       </div>
                       <button
                         type="button"
@@ -656,6 +666,59 @@ export const ShortcutsSettingsModal: React.FC<ShortcutsSettingsModalProps> = ({
                       >
                         {isVoiceListening ? 'Voice Follow: Active' : 'Start Voice Follow'}
                       </button>
+                    </div>
+
+                    {/* System Audio Input Device Selector & Live Input Meter */}
+                    <div className="p-2.5 rounded-xl bg-white/40 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label
+                          htmlFor="system-audio-input-select"
+                          className="text-[11px] font-semibold text-slate-800"
+                        >
+                          System Audio Input Source (Mic / Loopback):
+                        </label>
+                        <button
+                          type="button"
+                          onClick={onRefreshAudioDevices}
+                          className="apple-glass-btn px-2 py-0.5 text-[10px] font-semibold text-slate-700 cursor-pointer"
+                        >
+                          Refresh Devices
+                        </button>
+                      </div>
+
+                      <select
+                        id="system-audio-input-select"
+                        aria-label="System Audio Input Source"
+                        value={selectedAudioDeviceId}
+                        onChange={(e) => onChangeSelectedAudioDeviceId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-xl text-xs font-medium bg-white/80 text-slate-900 focus:outline-none cursor-pointer"
+                      >
+                        <option value="default">
+                          System Default Audio Input (macOS Sound Input)
+                        </option>
+                        {audioInputDevices
+                          .filter((d) => d.deviceId !== 'default')
+                          .map((device, idx) => (
+                            <option key={device.deviceId || idx} value={device.deviceId}>
+                              {device.label || `Audio Input Device ${idx + 1}`}
+                            </option>
+                          ))}
+                      </select>
+
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <span className="text-[10px] font-semibold text-slate-600 shrink-0">
+                          Input Level:
+                        </span>
+                        <div className="flex-1 h-2 rounded-full bg-slate-200/80 overflow-hidden">
+                          <div
+                            style={{ width: `${Math.min(100, Math.max(isVoiceListening ? 4 : 0, voiceAudioLevel))}%` }}
+                            className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-75"
+                          />
+                        </div>
+                        <span className="text-[10px] font-mono-tabular font-semibold text-slate-700 w-8 text-right">
+                          {isVoiceListening ? `${Math.round(voiceAudioLevel)}%` : 'Idle'}
+                        </span>
+                      </div>
                     </div>
 
                     <p className="text-[11px] text-slate-600">

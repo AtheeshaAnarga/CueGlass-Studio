@@ -245,6 +245,12 @@ public final class SettingsStore: ObservableObject {
     @Published public var showOrganizerCues: Bool {
         didSet { defaults.set(showOrganizerCues, forKey: Keys.showOrganizerCues) }
     }
+    @Published public var voiceDarkenWords: Bool {
+        didSet { defaults.set(voiceDarkenWords, forKey: Keys.voiceDarkenWords) }
+    }
+    @Published public var voiceDarkenOpacity: Double {
+        didSet { defaults.set(voiceDarkenOpacity, forKey: Keys.voiceDarkenOpacity) }
+    }
     @Published public var isCollapsedToBubble: Bool {
         didSet { defaults.set(isCollapsedToBubble, forKey: Keys.isCollapsedToBubble) }
     }
@@ -283,6 +289,8 @@ public final class SettingsStore: ObservableObject {
         static let lineHeightMultiplier = "cg.lineHeightMultiplier"
         static let narrowReadingWidth = "cg.narrowReadingWidth"
         static let showOrganizerCues = "cg.showOrganizerCues"
+        static let voiceDarkenWords = "cg.voiceDarkenWords"
+        static let voiceDarkenOpacity = "cg.voiceDarkenOpacity"
         static let isCollapsedToBubble = "cg.isCollapsedToBubble"
         static let activeBeatID = "cg.activeBeatID"
         static let checklistCompletion = "cg.checklistCompletion"
@@ -358,6 +366,16 @@ public final class SettingsStore: ObservableObject {
         } else {
             self.showOrganizerCues = defaults.bool(forKey: Keys.showOrganizerCues)
         }
+
+        if defaults.object(forKey: Keys.voiceDarkenWords) == nil {
+            self.voiceDarkenWords = true
+        } else {
+            self.voiceDarkenWords = defaults.bool(forKey: Keys.voiceDarkenWords)
+        }
+
+        let storedDarkenOpacity = defaults.double(forKey: Keys.voiceDarkenOpacity)
+        self.voiceDarkenOpacity = (defaults.object(forKey: Keys.voiceDarkenOpacity) != nil && storedDarkenOpacity >= 15 && storedDarkenOpacity <= 75) ? storedDarkenOpacity : 32.0
+
         self.isCollapsedToBubble = defaults.bool(forKey: Keys.isCollapsedToBubble)
         self.activeBeatID = defaults.string(forKey: Keys.activeBeatID)
 
@@ -391,14 +409,27 @@ public final class SettingsStore: ObservableObject {
         glassVariant = .clear
         glassTintPreset = .crystalNeutral
         glassInteractive = true
-        glassContainerSpacing = 10.0
-        liquidness = 88.0
+        glassContainerSpacing = 6.0
+        liquidness = 86.0
         glassTransparency = 82.0
-        glassEffectLevel = 92.0
-        activeBeatGlow = 85.0
+        glassEffectLevel = 90.0
+        activeBeatGlow = 82.0
         fontWeightOption = .medium
         fontSize = 26.0
         lineHeightMultiplier = 1.44
+    }
+
+    public func applyTahoeDarkGlassPreset() {
+        themeMode = .dark
+        windowLayoutMode = .fullLiquidGlass
+        glassVariant = .identity
+        glassTintPreset = .crystalNeutral
+        glassInteractive = true
+        glassContainerSpacing = 0.0
+        liquidness = 100.0
+        glassTransparency = 10.0
+        glassEffectLevel = 15.0
+        activeBeatGlow = 21.0
     }
 
     public func toggleChecklist(id: String) {

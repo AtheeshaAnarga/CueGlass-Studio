@@ -19,6 +19,8 @@ export interface ThreeBeatVoiceWindow {
   nextBeat: ScriptBlock | null;
   /** Next spoken dialogue beat (skips non-spoken stage cues if a cue sits between current and next spoken line) */
   nextSpokenBeat: ScriptBlock | null;
+  /** All navigable spoken beats in the currently selected section, used to guard against false jumps across similar-looking paragraphs in the same section */
+  sectionSpokenBeats?: ScriptBlock[];
 }
 
 export type VoiceTransitionAction =
@@ -238,14 +240,22 @@ export function getThreeBeatWindow(
   const beats: ScriptBlock[] = doc.allNavigableBeats;
   const idx = beats.findIndex((b: ScriptBlock) => b.id === activeBeatID);
   if (idx === -1) {
+    const firstBeat = beats[0] ?? null;
+    const sectionSpokenBeats = firstBeat
+      ? beats.filter(
+          (b: ScriptBlock) =>
+            b.sectionID === firstBeat.sectionID && b.kind === 'spokenLine'
+        )
+      : [];
     return {
       previousBeat: null,
-      currentBeat: beats[0] ?? null,
+      currentBeat: firstBeat,
       nextBeat: beats[1] ?? null,
       nextSpokenBeat:
         beats.slice(1).find((b: ScriptBlock) => b.kind === 'spokenLine') ??
         beats[1] ??
         null,
+      sectionSpokenBeats,
     };
   }
 
@@ -261,11 +271,17 @@ export function getThreeBeatWindow(
     }
   }
 
+  const sectionSpokenBeats = beats.filter(
+    (b: ScriptBlock) =>
+      b.sectionID === currentBeat.sectionID && b.kind === 'spokenLine'
+  );
+
   return {
     previousBeat,
     currentBeat,
     nextBeat,
     nextSpokenBeat,
+    sectionSpokenBeats,
   };
 }
 
@@ -388,6 +404,14 @@ export function wordsRoughlyMatch(
   return wordSimilarityScore(spoken, target) >= threshold;
 }
 
+function isSubstantiveContentWord(word: string): boolean {
+  return word.length >= 3 && !SHORT_STOPWORDS.has(word);
+}
+
+function isDistinctiveWord(word: string): boolean {
+  return word.length >= 5 && !SHORT_STOPWORDS.has(word);
+}
+
 /**
  * Checks whether a single spoken word matches two adjacent script words merged together,
  * OR whether two adjacent spoken words match a single compound script word
@@ -461,11 +485,14 @@ function checkCompoundOrContractionMatch(
  *    - If the speaker mispronounces `targetWords[cursor]` (so dictation outputs a garbled word)
  *      and then speaks `targetWords[cursor + 1]`, or directly speaks `targetWords[cursor + 1]`,
  *      the aligner bridges over `targetWords[cursor]` and advances to `cursor + 2`.
- * 4. **Multi-Word Stumble / Name Bridge (`cursor + 2` .. `cursor + 4`)**:
+ * 4. **Multi-Word Stumble / Name Bridge (`cursor + 2` .. `cursor + 3`)**:
  *    - If the speaker stumbles over 2–3 words (such as a complex name) and continues speaking
  *      the sentence in order, a 2-word ordered anchor phrase or a distinctive word following an
  *      unmatched spoken token seamlessly bridges to the exact spoken position.
- * 5. **Strict Anti-Runaway Guard**:
+ * 5. **Mid-Paragraph Phrase Pickup (`cursor + 2` .. `targetWords.length - 3`)**:
+ *    - If the speaker intentionally starts reading the current paragraph from the middle (speaking
+ *      at least 3 consecutive words in order with >= 2 content words), picks up directly at that phrase.
+ * 6. **Strict Anti-Runaway Guard**:
  *    - Never jumps ahead on isolated short stopwords (`"the"`, `"to"`, `"and"`, `"in"`) unless
  *      confirmed by an adjacent word in order.
  */
@@ -502,7 +529,6 @@ export function computeBeatWordProgress(
     for (let tPos = cursor - 1; tPos >= searchBackStart; tPos--) {
       for (let sPos = recentTokens.length - 1; sPos >= 0; sPos--) {
         if (wordsRoughlyMatch(recentTokens[sPos], targetWords[tPos], 'strict')) {
-          // Verify if the token right before also matches when available
           if (
             tPos === 0 ||
             sPos === 0 ||
@@ -512,9 +538,6 @@ export function computeBeatWordProgress(
               'normal'
             )
           ) {
-            // The token at `sPos` corresponds to already-spoken `targetWords[tPos]`.
-            // Advance `startTokenIdx` to the tokens spoken AFTER `sPos`, and align `cursor` to `tPos + 1`
-            // if `tPos + 1 >= cursor`.
             const impliedCursor = tPos + 1;
             if (impliedCursor >= cursor - 1) {
               startTokenIdx = sPos + 1;
@@ -528,8 +551,6 @@ export function computeBeatWordProgress(
     }
   }
 
-  // Track how many consecutive spoken tokens failed to match at `cursor`
-  // (a non-zero count means the user spoke a word that dictation garbled due to mispronunciation!)
   let consecutiveUnmatchedSpoken = 0;
 
   let i = startTokenIdx;
@@ -561,9 +582,7 @@ export function computeBeatWordProgress(
       continue;
     }
 
-    // 3. Two-word phonetic/slurred bridge at `cursor` + `cursor + 1`:
-    // What if the user slurred `targetWords[cursor]` (weak phonetic match >= 0.52)
-    // AND the very next spoken word `nextToken` matches `targetWords[cursor + 1]`?
+    // 3. Two-word phonetic/slurred bridge at `cursor` + `cursor + 1`
     if (
       nextToken &&
       cursor + 1 < targetWords.length &&
@@ -577,11 +596,7 @@ export function computeBeatWordProgress(
       continue;
     }
 
-    // 4. Single Mispronounced / Dropped Word Bridge (`cursor + 1`):
-    // If `token` itself matches `targetWords[cursor + 1]`, bridge `targetWords[cursor]` when:
-    // - We just heard an unmatched/garbled spoken token right before (`consecutiveUnmatchedSpoken >= 1`), OR
-    // - `nextToken` also matches `targetWords[cursor + 2]` in order (2-word sequence confirmation), OR
-    // - We are already mid-line (`cursor > 0`) and `targetWords[cursor + 1]` is a distinctive content word.
+    // 4. Single Mispronounced / Dropped Word Bridge (`cursor + 1`)
     if (cursor + 1 < targetWords.length) {
       const targetNext1 = targetWords[cursor + 1];
       const isTwoWordSequenceAtNext1 =
@@ -614,9 +629,7 @@ export function computeBeatWordProgress(
       }
     }
 
-    // 5. Multi-Word Mispronunciation / Name Stumble Bridge (`cursor + 2` to `cursor + 3`):
-    // Only triggers when the speaker actually uttered unmatched/garbled speech (`consecutiveUnmatchedSpoken >= 1`)
-    // so saying words from the middle of a sentence without speaking the earlier words never jumps ahead.
+    // 5. Multi-Word Mispronunciation / Name Stumble Bridge (`cursor + 2` to `cursor + 3`)
     let bridgedMultiWord = false;
     if (consecutiveUnmatchedSpoken >= 1) {
       const maxLookahead = Math.min(3, targetWords.length - cursor - 1);
@@ -662,8 +675,45 @@ export function computeBeatWordProgress(
       continue;
     }
 
-    // Otherwise this spoken token did not match at `cursor` (e.g., a garbled mispronunciation or "um"/"uh").
-    // Record that we heard an unmatched spoken word so the very next word can bridge `targetWords[cursor]`!
+    // 6. Intentional Mid-Paragraph Phrase Pickup inside `targetWords` (`offset >= 2`):
+    // If the speaker skipped earlier words in this beat and spoke >= 3 consecutive words in order
+    // (with at least 2 substantive content words), align `cursor` to the end of that spoken phrase.
+    if (i + 2 < recentTokens.length && cursor + 4 <= targetWords.length) {
+      const tok0 = recentTokens[i];
+      const tok1 = recentTokens[i + 1];
+      const tok2 = recentTokens[i + 2];
+      let matchedMidBeat = false;
+      for (
+        let tStart = cursor + 2;
+        tStart <= targetWords.length - 3;
+        tStart++
+      ) {
+        if (
+          wordsRoughlyMatch(tok0, targetWords[tStart], 'strict') &&
+          wordsRoughlyMatch(tok1, targetWords[tStart + 1], 'normal') &&
+          wordsRoughlyMatch(tok2, targetWords[tStart + 2], 'strict')
+        ) {
+          const phraseSlice = [
+            targetWords[tStart],
+            targetWords[tStart + 1],
+            targetWords[tStart + 2],
+          ];
+          const contentCount = phraseSlice.filter(isSubstantiveContentWord).length;
+          if (contentCount >= 2) {
+            cursor = tStart + 3;
+            lastMatchedWord = targetWords[tStart + 2];
+            consecutiveUnmatchedSpoken = 0;
+            i += 3;
+            matchedMidBeat = true;
+            break;
+          }
+        }
+      }
+      if (matchedMidBeat) {
+        continue;
+      }
+    }
+
     consecutiveUnmatchedSpoken += 1;
     i += 1;
   }
@@ -675,74 +725,394 @@ export function computeBeatWordProgress(
   };
 }
 
+interface CandidateBeatMatch {
+  /** Number of speakable words from index 0 up to the end of the matched phrase in candidateWords */
+  matchedCount: number;
+  /** Number of words actually spoken and matched in the phrase (matchedCount - startOffset) */
+  newlyMatchedWords: number;
+  /** Index in candidateWords where the speaker started reading (0 = beginning, >= 2 = mid-paragraph) */
+  startOffset: number;
+  /** Number of substantive non-stopword content words in the matched phrase */
+  contentWordCount: number;
+  /** Number of long distinctive words (>= 5 chars, non-stopword) in the matched phrase */
+  distinctiveWordCount: number;
+  /** The matched slice of candidateWords */
+  matchedPhrase: string[];
+  /** Last matched word for diagnostic UI */
+  lastWord: string | null;
+}
+
 /**
- * Checks if the recent spoken tokens match the beginning of a candidate beat (`nextBeat` or `previousBeat`).
- * Requires at least 2 consecutive matched words (or 1 word if the entire beat is a 1-word line)
- * to prevent accidental false jumps on single filler words.
+ * Checks if a beat's speakable words contain a contiguous match for `phraseWords`.
+ * Used to verify whether a spoken phrase also exists in `currentBeat` or another beat in the active section.
  */
-function matchCandidateBeatStart(
-  candidateWords: string[],
-  spokenTokens: string[]
-): { matchedCount: number; lastWord: string | null } {
-  if (candidateWords.length === 0 || spokenTokens.length === 0) {
-    return { matchedCount: 0, lastWord: null };
+function doesBeatContainContiguousPhrase(
+  beatWords: string[],
+  phraseWords: string[]
+): boolean {
+  if (phraseWords.length === 0 || beatWords.length < phraseWords.length) {
+    return false;
+  }
+  const pLen = phraseWords.length;
+  for (let start = 0; start <= beatWords.length - pLen; start++) {
+    let allMatch = true;
+    for (let k = 0; k < pLen; k++) {
+      if (!wordsRoughlyMatch(phraseWords[k], beatWords[start + k], 'normal')) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) return true;
+  }
+  return false;
+}
+
+/**
+ * Computes the longest contiguous sequence of `spokenTokens` that matches anywhere inside `beatWords`.
+ */
+function maxContiguousSpokenMatchInBeat(
+  beatWords: string[],
+  spokenTokens: string[],
+  fromIndex: number = 0
+): number {
+  if (beatWords.length === 0 || spokenTokens.length === 0) return 0;
+  const tail = spokenTokens.slice(-12);
+  let bestLen = 0;
+
+  for (let bStart = Math.max(0, fromIndex); bStart < beatWords.length; bStart++) {
+    for (let sStart = 0; sStart < tail.length; sStart++) {
+      let len = 0;
+      while (
+        bStart + len < beatWords.length &&
+        sStart + len < tail.length &&
+        wordsRoughlyMatch(tail[sStart + len], beatWords[bStart + len], 'normal')
+      ) {
+        len += 1;
+      }
+      if (len > bestLen) {
+        bestLen = len;
+      }
+    }
+  }
+  return bestLen;
+}
+
+/**
+ * Measures whether two paragraphs look structurally/lexically similar (e.g. parallel speaker intros or thank-you lines
+ * in the same section) by computing the overlap ratio of their substantive content words.
+ */
+function areParagraphsSimilarLooking(
+  wordsA: string[],
+  wordsB: string[]
+): boolean {
+  const contentA = new Set(wordsA.filter(isSubstantiveContentWord));
+  const contentB = new Set(wordsB.filter(isSubstantiveContentWord));
+  if (contentA.size === 0 || contentB.size === 0) return false;
+
+  let shared = 0;
+  for (const w of contentA) {
+    if (contentB.has(w)) {
+      shared += 1;
+    } else {
+      for (const wb of contentB) {
+        if (wordsRoughlyMatch(w, wb, 'strict')) {
+          shared += 1;
+          break;
+        }
+      }
+    }
   }
 
-  const tail = spokenTokens.slice(-10);
+  const minSize = Math.min(contentA.size, contentB.size);
+  return minSize >= 3 && shared / minSize >= 0.45;
+}
 
-  // Try starting from any token in the recent tail to see if the user began speaking the candidate beat
+/**
+ * Matches recent spoken tokens against a candidate beat (`nextBeat`, `nextSpokenBeat`, or `previousBeat`),
+ * supporting BOTH:
+ * 1. **Start-of-paragraph reading (`startOffset === 0` or `1`)**, AND
+ * 2. **Direct mid-paragraph reading (`startOffset >= 2`)** when the speaker skips the beginning of the
+ *    next paragraph (even without speaking the current paragraph first!).
+ *
+ * Enforces strict content-word density and contiguity rules for mid-paragraph jumps (`allowMidParagraph === true`).
+ */
+function matchCandidateBeatPhrase(
+  candidateWords: string[],
+  spokenTokens: string[],
+  allowMidParagraph: boolean = true
+): CandidateBeatMatch {
+  const emptyResult: CandidateBeatMatch = {
+    matchedCount: 0,
+    newlyMatchedWords: 0,
+    startOffset: 0,
+    contentWordCount: 0,
+    distinctiveWordCount: 0,
+    matchedPhrase: [],
+    lastWord: null,
+  };
+
+  if (candidateWords.length === 0 || spokenTokens.length === 0) {
+    return emptyResult;
+  }
+
+  const tail = spokenTokens.slice(-14);
+  const maxStartOffset = allowMidParagraph
+    ? candidateWords.length - 1
+    : Math.min(1, candidateWords.length - 1);
+
+  let bestMatch: CandidateBeatMatch = emptyResult;
+  let bestScore = -1;
+
   for (let startIdx = 0; startIdx < tail.length; startIdx++) {
-    // Allow matching from word 0 of the candidate beat, OR word 1 if word 0 was mispronounced
-    // and words 1 + 2 match in order
-    for (const candidateStartOffset of [0, 1]) {
-      if (candidateStartOffset >= candidateWords.length) continue;
+    for (
+      let candidateStartOffset = 0;
+      candidateStartOffset <= maxStartOffset;
+      candidateStartOffset++
+    ) {
+      const isMidParagraph = candidateStartOffset >= 2;
+      const initialStrictness = isMidParagraph ? 'strict' : 'normal';
+
       if (
         !wordsRoughlyMatch(
           tail[startIdx],
           candidateWords[candidateStartOffset],
-          'normal'
+          initialStrictness
         )
       ) {
         continue;
       }
 
-      let matched = candidateStartOffset + 1;
-      let lastWord = candidateWords[candidateStartOffset];
+      let cIdx = candidateStartOffset + 1;
       let tIdx = startIdx + 1;
+      let lastWord = candidateWords[candidateStartOffset];
+      let internalSkips = 0;
 
-      while (tIdx < tail.length && matched < candidateWords.length) {
-        if (wordsRoughlyMatch(tail[tIdx], candidateWords[matched], 'normal')) {
-          lastWord = candidateWords[matched];
-          matched += 1;
+      while (tIdx < tail.length && cIdx < candidateWords.length) {
+        if (wordsRoughlyMatch(tail[tIdx], candidateWords[cIdx], 'normal')) {
+          lastWord = candidateWords[cIdx];
+          cIdx += 1;
           tIdx += 1;
         } else if (
-          matched + 1 < candidateWords.length &&
-          wordsRoughlyMatch(tail[tIdx], candidateWords[matched + 1], 'strict') &&
-          !SHORT_STOPWORDS.has(candidateWords[matched + 1])
+          // Allow at most 1 single-word mispronunciation skip if confirmed by the following word in order
+          internalSkips === 0 &&
+          cIdx + 1 < candidateWords.length &&
+          wordsRoughlyMatch(tail[tIdx], candidateWords[cIdx + 1], 'strict') &&
+          isSubstantiveContentWord(candidateWords[cIdx + 1]) &&
+          (tIdx + 1 >= tail.length ||
+            cIdx + 2 >= candidateWords.length ||
+            wordsRoughlyMatch(
+              tail[tIdx + 1],
+              candidateWords[cIdx + 2],
+              'normal'
+            ))
         ) {
-          lastWord = candidateWords[matched + 1];
-          matched += 2;
+          lastWord = candidateWords[cIdx + 1];
+          cIdx += 2;
           tIdx += 1;
+          internalSkips += 1;
         } else {
+          // For mid-paragraph matching, stop extending on the first non-matching spoken token
+          // so only genuinely contiguous spoken phrases are measured.
+          if (isMidParagraph) {
+            break;
+          }
           tIdx += 1;
         }
       }
 
-      const newlyMatchedWords = matched - candidateStartOffset;
-      const minRequired =
-        candidateWords.length === 1
-          ? 1
-          : candidateStartOffset === 0
-          ? 2
-          : Math.min(2, candidateWords.length - 1);
+      const newlyMatchedWords = cIdx - candidateStartOffset - internalSkips;
+      const matchedPhrase = candidateWords.slice(candidateStartOffset, cIdx);
+      const contentWordCount = matchedPhrase.filter(isSubstantiveContentWord).length;
+      const distinctiveWordCount = matchedPhrase.filter(isDistinctiveWord).length;
 
-      if (newlyMatchedWords >= minRequired) {
-        return { matchedCount: matched, lastWord };
+      let passesThreshold = false;
+      if (!isMidParagraph) {
+        // Start of paragraph (offset 0 or 1):
+        const minRequired =
+          candidateWords.length === 1
+            ? 1
+            : candidateStartOffset === 0
+            ? 2
+            : Math.min(2, candidateWords.length - 1);
+        passesThreshold =
+          newlyMatchedWords >= minRequired &&
+          (contentWordCount >= 1 || newlyMatchedWords >= 3);
+      } else {
+        // Mid-paragraph (offset >= 2):
+        // Require either:
+        // (a) >= 3 consecutive/ordered words with >= 2 substantive content words, OR
+        // (b) >= 3 consecutive words with >= 1 distinctive word (>= 5 chars) and 0 internal skips, OR
+        // (c) >= 2 consecutive content words (0 skips) where at least 1 is a distinctive word (>= 5 chars)
+        const hasThreeWordAnchor =
+          newlyMatchedWords >= 3 &&
+          (contentWordCount >= 2 ||
+            (distinctiveWordCount >= 1 && internalSkips === 0));
+        const hasTwoDistinctiveAnchor =
+          newlyMatchedWords >= 2 &&
+          internalSkips === 0 &&
+          contentWordCount >= 2 &&
+          distinctiveWordCount >= 1;
+
+        passesThreshold = hasThreeWordAnchor || hasTwoDistinctiveAnchor;
+      }
+
+      if (passesThreshold) {
+        // Prefer longer contiguous matches, higher content word count, and earlier start offset on ties
+        const score =
+          newlyMatchedWords * 100 +
+          contentWordCount * 25 +
+          distinctiveWordCount * 15 -
+          (isMidParagraph ? 10 : 0) -
+          candidateStartOffset * 0.5;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = {
+            matchedCount: cIdx,
+            newlyMatchedWords,
+            startOffset: candidateStartOffset,
+            contentWordCount,
+            distinctiveWordCount,
+            matchedPhrase,
+            lastWord,
+          };
+        }
       }
     }
   }
 
-  return { matchedCount: 0, lastWord: null };
+  return bestMatch;
+}
+
+/**
+ * Verifies that a candidate match in `nextBeat` is NOT a false positive caused by:
+ * 1. The exact same (or equally strong) phrase appearing in `currentBeat` (`currentWords`).
+ * 2. `currentBeat` and `nextBeat` being "same-looking paragraphs" where the user only spoke a shared template phrase.
+ * 3. Another paragraph in the selected section (`sectionSpokenBeats`) sharing the exact same mid-paragraph phrase.
+ */
+function isNextBeatMatchUnambiguous(
+  match: CandidateBeatMatch,
+  candidateBeatID: string,
+  candidateWords: string[],
+  currentWords: string[],
+  currentSpokenCount: number,
+  spokenTokens: string[],
+  window: ThreeBeatVoiceWindow
+): boolean {
+  if (match.newlyMatchedWords <= 0 || match.matchedPhrase.length === 0) {
+    return false;
+  }
+
+  // 1. Check how strongly the spoken tokens match inside `currentBeat` (especially from `currentSpokenCount` onward)
+  const currentForwardContiguous = maxContiguousSpokenMatchInBeat(
+    currentWords,
+    spokenTokens,
+    currentSpokenCount
+  );
+  const currentAnywhereContiguous = maxContiguousSpokenMatchInBeat(
+    currentWords,
+    spokenTokens,
+    0
+  );
+
+  // If the spoken phrase matches inside the remaining part of `currentBeat` just as well as (or within 1 word of) `nextBeat`,
+  // stay on `currentBeat`! Never jump away when the user is speaking words that exist in `currentBeat`.
+  if (
+    currentForwardContiguous >= match.newlyMatchedWords ||
+    (currentForwardContiguous >= 2 &&
+      currentForwardContiguous >= match.newlyMatchedWords - 1)
+  ) {
+    return false;
+  }
+
+  // If the exact matched phrase from `nextBeat` appears contiguously anywhere in `currentBeat`,
+  // and `currentBeat` is not yet near its end, do not jump on a shared phrase!
+  const isNearEndOfCurrent =
+    currentWords.length > 0 &&
+    currentSpokenCount >= Math.max(1, currentWords.length - 2);
+
+  if (
+    !isNearEndOfCurrent &&
+    (doesBeatContainContiguousPhrase(currentWords, match.matchedPhrase) ||
+      currentAnywhereContiguous >= match.newlyMatchedWords)
+  ) {
+    return false;
+  }
+
+  // 2. If `previousBeat` also contains this exact mid-paragraph phrase and we haven't started `currentBeat`, guard against echo
+  if (match.startOffset >= 2 && window.previousBeat) {
+    const prevWords = extractSpeakableWords(
+      window.previousBeat.kind === 'spokenLine'
+        ? window.previousBeat.rawMarkdown
+        : window.previousBeat.displayText
+    );
+    if (
+      doesBeatContainContiguousPhrase(prevWords, match.matchedPhrase) &&
+      match.newlyMatchedWords < 4
+    ) {
+      return false;
+    }
+  }
+
+  // 3. Same-Looking Paragraph Guard across the currently selected section:
+  // Check if `currentBeat` and `candidateWords` are similar-looking paragraphs, OR if another beat
+  // in `window.sectionSpokenBeats` contains the exact same phrase.
+  const currentContentSet = new Set(
+    currentWords.filter(isSubstantiveContentWord)
+  );
+  const hasUniqueWordVersusCurrent = match.matchedPhrase.some(
+    (w) =>
+      isSubstantiveContentWord(w) &&
+      !currentContentSet.has(w) &&
+      !Array.from(currentContentSet).some((cw) =>
+        wordsRoughlyMatch(w, cw, 'strict')
+      )
+  );
+
+  // For any mid-paragraph jump (or when `currentBeat` and `nextBeat` look similar),
+  // the spoken phrase MUST contain at least 1 substantive content word that does NOT appear in `currentBeat`!
+  const similarToCurrent = areParagraphsSimilarLooking(
+    currentWords,
+    candidateWords
+  );
+  if ((match.startOffset >= 2 || similarToCurrent) && !hasUniqueWordVersusCurrent) {
+    return false;
+  }
+
+  // If `currentBeat` and `nextBeat` are similar-looking paragraphs and we are not near the end of `currentBeat`,
+  // require at least 3 matched words (or 2 distinctive unique words) so shared opening/middle boilerplate never jumps early.
+  if (
+    similarToCurrent &&
+    !isNearEndOfCurrent &&
+    match.newlyMatchedWords < 3 &&
+    match.distinctiveWordCount < 2
+  ) {
+    return false;
+  }
+
+  // Check other paragraphs in the selected section (`sectionSpokenBeats`) for duplicate phrases
+  if (window.sectionSpokenBeats && window.sectionSpokenBeats.length > 1) {
+    const duplicateInOtherSectionBeat = window.sectionSpokenBeats.some(
+      (otherBeat) => {
+        if (
+          otherBeat.id === candidateBeatID ||
+          otherBeat.id === window.currentBeat?.id
+        ) {
+          return false;
+        }
+        const otherWords = extractSpeakableWords(otherBeat.rawMarkdown);
+        return doesBeatContainContiguousPhrase(otherWords, match.matchedPhrase);
+      }
+    );
+
+    // If another paragraph in the selected section has this exact same phrase,
+    // don't jump on a short 2–3 word template phrase—require at least 4 matched words!
+    if (duplicateInOtherSectionBeat && match.newlyMatchedWords < 4) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -753,11 +1123,12 @@ function matchCandidateBeatStart(
  * 1. Updates word-by-word progress inside `currentBeat` (progressive darkening).
  *    If N-best alternatives are provided by Siri Dictation, picks the alternative that
  *    advances `currentBeat` best in sequential order.
- * 2. When `currentBeat` reaches the end of its speakable words (or within the last word of a long beat
- *    when the final word is trailed off), returns `action: 'advanceToNext'` so the app switches
- *    to `nextSpokenBeat` and resets old word memory.
- * 3. If the speaker skips ahead and starts reading `nextBeat` / `nextSpokenBeat`, returns
- *    `action: 'jumpToNextWithProgress'` with the initial matched word count in that next beat.
+ * 2. When `currentBeat` reaches the end of its speakable words, returns `action: 'advanceToNext'`
+ *    so the app switches to `nextSpokenBeat` and resets old word memory.
+ * 3. If the speaker skips ahead and starts reading `nextBeat` / `nextSpokenBeat` — EITHER from the
+ *    beginning OR directly from the middle of the next paragraph (even without speaking `currentBeat` first) —
+ *    verifies that the phrase is unambiguous against `currentBeat` and similar-looking paragraphs in the
+ *    selected section, and returns `action: 'jumpToNextWithProgress'` with the matched word offset.
  * 4. If the speaker repeats `previousBeat` (when `currentSpokenCount === 0`), returns `action: 'stepBackToPrev'`.
  */
 export function evaluateThreeBeatWindow(
@@ -800,7 +1171,6 @@ export function evaluateThreeBeatWindow(
   }
 
   // 1. Evaluate `currentBeat` across the primary transcript and any N-best recognition alternatives
-  // so if a mispronounced word appears accurately in alternative #2 or #3, we pick it up effortlessly!
   let bestCurrentProgress = computeBeatWordProgress(
     currentWords,
     primarySpokenTokens,
@@ -842,9 +1212,7 @@ export function evaluateThreeBeatWindow(
     }
   }
 
-  // 2. Check if the user has started speaking `nextBeat` or `nextSpokenBeat`
-  // (Either when `currentBeat` didn't advance on this utterance, OR when `currentBeat` is >= 70% done
-  // and the speaker trailed off the last word of `currentBeat` and began speaking `nextBeat`!)
+  // 2. Check if the user has started speaking `nextBeat` or `nextSpokenBeat` (from the start OR from the middle!)
   const didAdvanceCurrent =
     bestCurrentProgress.spokenWordCount > currentSpokenCount;
   const isNearEndOfCurrent =
@@ -863,21 +1231,44 @@ export function evaluateThreeBeatWindow(
           ? candidate.rawMarkdown
           : candidate.displayText
       );
-      const nextMatch = matchCandidateBeatStart(
-        candidateWords,
-        primarySpokenTokens
-      );
-      if (nextMatch.matchedCount >= 2) {
-        return {
-          action: 'jumpToNextWithProgress',
-          spokenWordCount: Math.min(
-            candidateWords.length,
-            nextMatch.matchedCount
-          ),
-          totalSpeakableWords: candidateWords.length,
-          targetBeatID: candidate.id,
-          lastMatchedWord: nextMatch.lastWord,
-        };
+
+      for (const candidateTranscript of allTranscriptCandidates) {
+        const candidateSpokenTokens = extractSpeakableWords(candidateTranscript);
+        if (candidateSpokenTokens.length === 0) continue;
+
+        const nextMatch = matchCandidateBeatPhrase(
+          candidateWords,
+          candidateSpokenTokens,
+          true
+        );
+
+        if (
+          nextMatch.newlyMatchedWords >= 2 &&
+          isNextBeatMatchUnambiguous(
+            nextMatch,
+            candidate.id,
+            candidateWords,
+            currentWords,
+            currentSpokenCount,
+            candidateSpokenTokens,
+            window
+          )
+        ) {
+          // Cap spokenWordCount to `candidateWords.length - 1` when jumping into a multi-word beat
+          // so jumping into the middle/end of `nextBeat` lands cleanly on `nextBeat` rather than double-skipping past it.
+          const targetSpokenWordCount =
+            candidateWords.length > 1
+              ? Math.min(candidateWords.length - 1, nextMatch.matchedCount)
+              : nextMatch.matchedCount;
+
+          return {
+            action: 'jumpToNextWithProgress',
+            spokenWordCount: targetSpokenWordCount,
+            totalSpeakableWords: candidateWords.length,
+            targetBeatID: candidate.id,
+            lastMatchedWord: nextMatch.lastWord,
+          };
+        }
       }
     }
 
@@ -888,11 +1279,21 @@ export function evaluateThreeBeatWindow(
           ? window.previousBeat.rawMarkdown
           : window.previousBeat.displayText
       );
-      const prevMatch = matchCandidateBeatStart(prevWords, primarySpokenTokens);
-      if (prevMatch.matchedCount >= 2) {
+      const prevMatch = matchCandidateBeatPhrase(
+        prevWords,
+        primarySpokenTokens,
+        false
+      );
+      if (
+        prevMatch.newlyMatchedWords >= 2 &&
+        !doesBeatContainContiguousPhrase(currentWords, prevMatch.matchedPhrase)
+      ) {
         return {
           action: 'stepBackToPrev',
-          spokenWordCount: Math.min(prevWords.length, prevMatch.matchedCount),
+          spokenWordCount: Math.min(
+            Math.max(1, prevWords.length - 1),
+            prevMatch.matchedCount
+          ),
           totalSpeakableWords: prevWords.length,
           targetBeatID: window.previousBeat.id,
           lastMatchedWord: prevMatch.lastWord,

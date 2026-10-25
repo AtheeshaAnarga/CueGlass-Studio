@@ -1,6 +1,6 @@
 {
   "name": "Pathfinder Glass",
   "description": "Near-camera Liquid Glass moderator script overlay and native macOS utility for Pathfinder ’26.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

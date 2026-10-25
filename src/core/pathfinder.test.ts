@@ -381,4 +381,60 @@ test('VoiceTrackerTests: recovers effortlessly from bad pronunciation, phonetic 
   assert.equal(finalDecision.targetBeatID, win.nextBeat?.id);
 });
 
+test('VoiceTrackerTests: switches to next paragraph automatically when spoken from the middle (even with 0 words spoken in current line), while blocking false jumps on same-looking paragraphs in the selected section', () => {
+  const scriptWithDistinctAndSimilarBeats = `# Mid-Paragraph Jump & Ambiguity Test
+## 01 — Speaker Transitions
+Thank you Dr. Perera for sharing those deep technical insights with our audience tonight.
+
+Thank you Dr. Silva for sharing those deep technical insights with our community and exploring quantum cryptography.
+
+In our third segment we will open the floor for interactive live demonstrations.`;
+
+  const doc = parseMarkdownScript(scriptWithDistinctAndSimilarBeats);
+  let nav = createInitialNavState(doc);
+  const win1 = getThreeBeatWindow(doc, nav.activeBeatID);
+
+  // Beat 1 (current): "Thank you Dr. Perera for sharing those deep technical insights with our audience tonight."
+  // Beat 2 (next):    "Thank you Dr. Silva for sharing those deep technical insights with our community and exploring quantum cryptography."
+  // Both Beat 1 and Beat 2 are in the same section and look very similar, sharing "for sharing those deep technical insights".
+
+  // 1. Ambiguity Guard: If the user hasn't spoken Beat 1 yet (spokenWordCount = 0) and starts reading from the middle
+  // using the SHARED phrase "sharing those deep technical insights", it must NOT jump prematurely to Beat 2!
+  // Instead, it stays on Beat 1 and tracks up to "insights" in Beat 1.
+  const sharedPhraseDecision = evaluateThreeBeatWindow(
+    win1,
+    'sharing those deep technical insights',
+    0
+  );
+  assert.equal(sharedPhraseDecision.action, 'stay');
+  assert.equal(sharedPhraseDecision.targetBeatID, null);
+  assert.equal(sharedPhraseDecision.spokenWordCount, 10);
+
+  // 2. Direct Mid-Paragraph Jump (with 0 words spoken in Beat 1):
+  // Now suppose the user is at the start of Beat 1 (spokenWordCount = 0) and skips directly to the middle of Beat 2,
+  // speaking a distinctive phrase from the middle of Beat 2 ("with our community and exploring" or "exploring quantum cryptography")
+  // without speaking Beat 1 or the first words of Beat 2!
+  const midNextDecision = evaluateThreeBeatWindow(
+    win1,
+    'with our community and exploring',
+    0
+  );
+  assert.equal(midNextDecision.action, 'jumpToNextWithProgress');
+  assert.equal(midNextDecision.targetBeatID, win1.nextBeat?.id);
+  // "Thank(1) you(2) Dr(3) Silva(4) for(5) sharing(6) those(7) deep(8) technical(9) insights(10) with(11) our(12) community(13) and(14) exploring(15)"
+  assert.equal(midNextDecision.spokenWordCount, 15);
+
+  // 3. Also test 2-word distinctive mid-paragraph jump into Beat 3 ("interactive live demonstrations") without speaking Beat 2:
+  nav = selectBeatById(doc, nav, win1.nextBeat!.id);
+  const win2 = getThreeBeatWindow(doc, nav.activeBeatID);
+  const midBeat3Decision = evaluateThreeBeatWindow(
+    win2,
+    'interactive live',
+    0
+  );
+  assert.equal(midBeat3Decision.action, 'jumpToNextWithProgress');
+  assert.equal(midBeat3Decision.targetBeatID, win2.nextBeat?.id);
+});
+
+
 

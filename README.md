@@ -107,18 +107,25 @@ The production web bundle in `dist/` includes `cueglass-icon.svg` as its favicon
 
 ---
 
-## 🎙️ Using Voice Auto-Follow & Word Darkening Settings
+## 🎙️ System Audio Input, Voice Auto-Follow & Word Darkening Settings
 
-1. Click **`▶ Voice Follow`** in the bottom bar of the floating teleprompter window.
-2. Speak your script naturally:
-   - The 3-beat engine tracks your exact spoken words in sequential order within the active beat.
-   - If a word is mispronounced or slurred by dictation, phonetic skeleton matching and 5-word lookahead automatically recover as soon as you speak the next words.
-   - Reaching the end of the current beat automatically advances and smoothly scrolls to the next beat.
-3. **Customizing or Turning Off Word Darkening:**
-   - Click the **Settings Gear (`⚙`)** in the top bar (or open **All Cap Settings & Shortcuts**).
-   - Under **Auto Voice Follow & Spoken Word Darkening**, choose between:
-     - **Darken Spoken Words:** Dims words you have already spoken (with a slider to adjust dimmed opacity between `15%` and `75%` and an optional target-word underline).
-     - **Stop Word Darkening (Clean View):** Keeps all words at 100% crisp brightness without darkening while still listening and automatically switching lines when you finish speaking.
+CueGlass Studio captures live audio directly from your **System Audio Input** (built-in MacBook Studio Mics, external USB/XLR interfaces, AirPods, or virtual system audio loopback drivers like **BlackHole 2ch** / **Rogue Amoeba Loopback**):
+
+1. **Start Hands-Free Voice Follow:**
+   - Click **`▶ Voice Follow`** in the bottom bar of the floating teleprompter window.
+   - Speak your script naturally:
+     - The 3-beat engine tracks your exact spoken words in sequential order within the active beat.
+     - If a word is mispronounced or slurred by dictation, phonetic skeleton matching (`toPhoneticCode`) and 5-word lookahead automatically recover as soon as you speak the next words.
+     - Reaching the end of the current beat automatically advances and smoothly scrolls to the next beat.
+2. **Selecting Your System Audio Input Source & Live Level Meter:**
+   - Click the **Settings Gear (`⚙`)** in the top bar → **All Cap Settings & Shortcuts…** (or open the gear popover).
+   - Under **Auto Voice Follow · System Audio Input & Word Darkening**:
+     - Choose **System Default Audio Input (Mic / Loopback)** or select any specific connected audio input / virtual loopback device from the dropdown, and click **Refresh Devices** whenever you plug in a new mic or route system audio.
+     - Verify your signal in real time using the **Live Input Level** meter bar (`0%–100%`).
+3. **Customizing or Turning Off Spoken Word Darkening:**
+   - Choose between:
+     - **Darken Spoken Words:** Progressively dims words you have already spoken in the active beat (with a slider to adjust dimmed opacity between `15%` and `75%` and an optional target-word underline).
+     - **Stop Word Darkening (Clean View):** Keeps all words at 100% crisp brightness without darkening while still listening to your system audio input and automatically switching lines when you finish speaking.
 
 ---
 
@@ -153,7 +160,7 @@ The production web bundle in `dist/` includes `cueglass-icon.svg` as its favicon
 │   ├── Build-Pathfinder-Glass-DMG.command        # Self-contained 1-click macOS .command DMG builder
 │   └── PathfinderGlass-macOS-Xcode-Source.tar.gz # Complete Native Xcode & SwiftPM source archive
 ├── src/
-│   ├── App.tsx                                   # Main Liquid Glass Studio & Voice Auto-Follow controller
+│   ├── App.tsx                                   # Main Liquid Glass Studio & System Audio Voice controller
 │   ├── index.css                                 # Apple macOS 26 Tahoe Liquid Glass & slider physics CSS
 │   ├── components/                               # Modular UI modals, RichTextRenderer, & popovers
 │   └── core/
@@ -174,8 +181,33 @@ The production web bundle in `dist/` includes `cueglass-icon.svg` as its favicon
 
 ---
 
+## 🌐 Publishing Your Open-Source Release on GitHub
+
+```bash
+# 1. Initialize git repository & commit all files
+git init
+git add .
+git commit -m "feat: CueGlass Studio (Pathfinder Glass) v2.1 — macOS Tahoe Liquid Glass & System Audio Voice Follow"
+
+# 2. Push to your GitHub repository
+git branch -M main
+git remote add origin https://github.com/<your-username>/cueglass-studio.git
+git push -u origin main
+
+# 3. Build the Native macOS .app (with AppIcon.icns) & .dmg installer on your Mac
+./package-dmg.sh
+
+# 4. Attach dist/Pathfinder-Glass.dmg to a GitHub Release (using GitHub CLI)
+gh release create v2.1.0 dist/Pathfinder-Glass.dmg \
+  --title "CueGlass Studio v2.1.0 (macOS Tahoe Liquid Glass)" \
+  --notes "Native macOS .app & .dmg with embedded Retina AppIcon.icns, Apple Clear & Tahoe Dark Liquid Glass presets, and System Audio Voice Auto-Follow."
+```
+
+---
+
 ## 🤝 Contributing & License
 
 Contributions, issues, and feature requests are welcome! Feel free to fork this repository, customize `Resources/Pathfinder26.md` or use the built-in **AI Script Generator Prompt** (`✨`) for your own events, and submit pull requests.
 
 Released under the **[MIT License](LICENSE)**.
+

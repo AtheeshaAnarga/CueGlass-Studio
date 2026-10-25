@@ -142,14 +142,6 @@ public struct SettingsView: View {
                         )
 
                         AppleLiquidGlassSlider(
-                            title: "GlassEffectContainer Morphing Spacing",
-                            valueLabel: "\(Int(settings.glassContainerSpacing)) pt",
-                            value: $settings.glassContainerSpacing,
-                            in: 0...28,
-                            isDark: isDark
-                        )
-
-                        AppleLiquidGlassSlider(
                             title: "Active Beat Focus Lens Glow",
                             valueLabel: "\(Int(settings.activeBeatGlow))%",
                             value: $settings.activeBeatGlow,
@@ -163,6 +155,79 @@ public struct SettingsView: View {
                             cornerRadius: 14,
                             variant: settings.glassVariant,
                             tintColor: nil,
+                            interactive: false,
+                            isDark: isDark,
+                            liquidness: settings.liquidness
+                        )
+                    )
+
+                    // 2B. Auto Voice Follow · System Audio Input & Spoken Word Darkening
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Label("AUTO VOICE FOLLOW · SYSTEM AUDIO INPUT & WORD DARKENING", systemImage: "waveform.and.mic")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Button {
+                                coordinator.voiceFollow.toggleListening()
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: coordinator.voiceFollow.isListening ? "stop.fill" : "play.fill")
+                                        .font(.system(size: 9.5, weight: .bold))
+                                    Text(coordinator.voiceFollow.isListening ? "Stop Voice Follow" : "Start Voice Follow")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                            }
+                            .appleLiquidGlassButton(
+                                prominent: coordinator.voiceFollow.isListening,
+                                isDark: isDark,
+                                tint: coordinator.voiceFollow.isListening ? .green : nil
+                            )
+                        }
+
+                        HStack(spacing: 8) {
+                            Image(systemName: "mic.badge.plus")
+                                .font(.system(size: 11.5))
+                                .foregroundColor(.secondary)
+                            Text("System Audio Input Level (Active macOS Input Device):")
+                                .font(.system(size: 11.5, weight: .medium))
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule()
+                                        .fill(Color.secondary.opacity(0.2))
+                                    Capsule()
+                                        .fill(Color.green)
+                                        .frame(width: max(4, geo.size.width * CGFloat(coordinator.voiceFollow.audioInputLevel)))
+                                }
+                            }
+                            .frame(height: 6)
+                            Text("\(Int(coordinator.voiceFollow.audioInputLevel * 100))%")
+                                .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                                .frame(width: 36, alignment: .trailing)
+                        }
+
+                        Picker("Spoken Word Highlight Mode", selection: $settings.voiceDarkenWords) {
+                            Text("Darken Spoken Words").tag(true)
+                            Text("Stop Word Darkening (Clean View)").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+
+                        if settings.voiceDarkenWords {
+                            AppleLiquidGlassSlider(
+                                title: "Spoken Word Dimmed Opacity (Lower = Darker Spoken Words)",
+                                valueLabel: "\(Int(settings.voiceDarkenOpacity))%",
+                                value: $settings.voiceDarkenOpacity,
+                                in: 15...75,
+                                isDark: isDark
+                            )
+                        }
+                    }
+                    .padding(12)
+                    .modifier(
+                        AppleLiquidGlassSurfaceModifier(
+                            cornerRadius: 14,
+                            variant: settings.glassVariant,
+                            tintColor: Color.green.opacity(isDark ? 0.10 : 0.08),
                             interactive: false,
                             isDark: isDark,
                             liquidness: settings.liquidness
