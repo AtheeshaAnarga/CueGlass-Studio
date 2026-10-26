@@ -197,7 +197,7 @@ public struct WindowGeometryCalculator: Sendable {
 }
 
 @MainActor
-public final class SettingsStore: ObservableObject {
+public final class SettingsStore: ObservableObject, @unchecked Sendable {
     private let defaults: UserDefaults
 
     @Published public var themeMode: AppThemeMode {
@@ -251,6 +251,9 @@ public final class SettingsStore: ObservableObject {
     @Published public var voiceDarkenOpacity: Double {
         didSet { defaults.set(voiceDarkenOpacity, forKey: Keys.voiceDarkenOpacity) }
     }
+    @Published public var voiceShowTargetUnderline: Bool {
+        didSet { defaults.set(voiceShowTargetUnderline, forKey: Keys.voiceShowTargetUnderline) }
+    }
     @Published public var isCollapsedToBubble: Bool {
         didSet { defaults.set(isCollapsedToBubble, forKey: Keys.isCollapsedToBubble) }
     }
@@ -291,12 +294,13 @@ public final class SettingsStore: ObservableObject {
         static let showOrganizerCues = "cg.showOrganizerCues"
         static let voiceDarkenWords = "cg.voiceDarkenWords"
         static let voiceDarkenOpacity = "cg.voiceDarkenOpacity"
+        static let voiceShowTargetUnderline = "cg.voiceShowTargetUnderline"
         static let isCollapsedToBubble = "cg.isCollapsedToBubble"
         static let activeBeatID = "cg.activeBeatID"
         static let checklistCompletion = "cg.checklistCompletion"
         static let rehearsalAcknowledged = "cg.rehearsalAcknowledged"
         static let hasSeenScreenShareNotice = "cg.hasSeenScreenShareNotice"
-        static let lastExpandedFrame = "cg.lastExpandedFrame"
+        static let lastExpandedFrame = "cg.v2.lastExpandedFrame"
         static let lastBubbleOrigin = "cg.lastBubbleOrigin"
     }
 
@@ -375,6 +379,12 @@ public final class SettingsStore: ObservableObject {
 
         let storedDarkenOpacity = defaults.double(forKey: Keys.voiceDarkenOpacity)
         self.voiceDarkenOpacity = (defaults.object(forKey: Keys.voiceDarkenOpacity) != nil && storedDarkenOpacity >= 15 && storedDarkenOpacity <= 75) ? storedDarkenOpacity : 32.0
+
+        if defaults.object(forKey: Keys.voiceShowTargetUnderline) == nil {
+            self.voiceShowTargetUnderline = true
+        } else {
+            self.voiceShowTargetUnderline = defaults.bool(forKey: Keys.voiceShowTargetUnderline)
+        }
 
         self.isCollapsedToBubble = defaults.bool(forKey: Keys.isCollapsedToBubble)
         self.activeBeatID = defaults.string(forKey: Keys.activeBeatID)

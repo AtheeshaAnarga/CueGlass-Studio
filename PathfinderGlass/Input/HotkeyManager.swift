@@ -51,13 +51,13 @@ public struct HotkeyRegistrationStatus: Identifiable, Sendable, Equatable {
 }
 
 @MainActor
-public final class HotkeyManager: ObservableObject {
+public final class HotkeyManager: ObservableObject, @unchecked Sendable {
     @Published public private(set) var statuses: [HotkeyRegistrationStatus] = []
     private var hotKeyRefs: [EventHotKeyRef?] = []
     private var eventHandlerRef: EventHandlerRef? = nil
     public var onAction: ((GlobalChordAction) -> Void)?
 
-    private static weak var sharedInstance: HotkeyManager?
+    nonisolated(unsafe) private static weak var sharedInstance: HotkeyManager?
 
     public init() {
         Self.sharedInstance = self
@@ -87,7 +87,7 @@ public final class HotkeyManager: ObservableObject {
                   let action = GlobalChordAction(rawValue: hotKeyID.id) else {
                 return OSStatus(eventNotHandledErr)
             }
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 HotkeyManager.sharedInstance?.onAction?(action)
             }
             return noErr

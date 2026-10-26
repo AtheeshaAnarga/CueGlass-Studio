@@ -10,7 +10,7 @@ public enum ArrowCaptureState: Equatable, Sendable {
 }
 
 @MainActor
-public final class GlobalArrowCapture: ObservableObject {
+public final class GlobalArrowCapture: ObservableObject, @unchecked Sendable {
     @Published public private(set) var state: ArrowCaptureState = .inactive
     private var eventTap: CFMachPort? = nil
     private var runLoopSource: CFRunLoopSource? = nil
@@ -18,7 +18,7 @@ public final class GlobalArrowCapture: ObservableObject {
 
     public var onBareArrow: ((GlobalChordAction) -> Void)?
 
-    private static weak var sharedInstance: GlobalArrowCapture?
+    nonisolated(unsafe) private static weak var sharedInstance: GlobalArrowCapture?
 
     public init() {
         // Always default OFF on launch per specification
@@ -69,7 +69,7 @@ public final class GlobalArrowCapture: ObservableObject {
         let mask = (1 << CGEventType.keyDown.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, _ in
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-                Task { @MainActor in
+                DispatchQueue.main.async {
                     GlobalArrowCapture.sharedInstance?.reenableTapIfAppropriate()
                 }
                 return Unmanaged.passUnretained(event)
@@ -99,7 +99,7 @@ public final class GlobalArrowCapture: ObservableObject {
                 return Unmanaged.passUnretained(event)
             }
 
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 GlobalArrowCapture.sharedInstance?.onBareArrow?(action)
             }
             return nil // Consume solely unmodified arrow key-down

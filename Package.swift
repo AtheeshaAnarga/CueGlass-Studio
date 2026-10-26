@@ -22,5 +22,8 @@ let package = Package(
             dependencies: ["PathfinderGlass"],
             path: "PathfinderGlassTests"
         )
-    ]
+    ],
+    swiftLanguageModes: [.v5]
 )
+
+

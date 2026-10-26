@@ -20,7 +20,11 @@ APP_BUNDLE="${DIST_DIR}/Pathfinder Glass.app"
 DMG_PATH="${DIST_DIR}/Pathfinder-Glass.dmg"
 STAGING_DIR="${DIST_DIR}/dmg-staging"
 
+echo "==> Stopping any running instance of Pathfinder Glass..."
+killall PathfinderGlass >/dev/null 2>&1 || true
+
 echo "==> Building latest Release app bundle..."
+chmod +x "${ROOT_DIR}/build-release.sh"
 "${ROOT_DIR}/build-release.sh"
 
 rm -rf "${STAGING_DIR}" "${DMG_PATH}"
@@ -37,4 +41,21 @@ hdiutil create \
   "${DMG_PATH}"
 
 rm -rf "${STAGING_DIR}"
+
+echo "==> Installing 'Pathfinder Glass.app' to /Applications..."
+if [[ -w "/Applications" ]]; then
+  rm -rf "/Applications/Pathfinder Glass.app"
+  cp -R "${APP_BUNDLE}" "/Applications/Pathfinder Glass.app"
+  xattr -cr "/Applications/Pathfinder Glass.app" 2>/dev/null || true
+  echo "SUCCESS: Installed '/Applications/Pathfinder Glass.app'"
+else
+  echo "NOTE: /Applications is not directly writable; launching from '${APP_BUNDLE}'"
+fi
+
 echo "SUCCESS: Packaged '${DMG_PATH}'"
+open -R "${DMG_PATH}" 2>/dev/null || true
+if [[ -d "/Applications/Pathfinder Glass.app" ]]; then
+  open "/Applications/Pathfinder Glass.app"
+else
+  open "${APP_BUNDLE}"
+fi

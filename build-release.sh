@@ -33,6 +33,7 @@ if [[ ! -f "${BIN_PATH}" ]]; then
 fi
 
 echo "==> [3/5] Assembling '${APP_NAME}' bundle..."
+killall PathfinderGlass >/dev/null 2>&1 || true
 rm -rf "${APP_BUNDLE}"
 mkdir -p "${APP_BUNDLE}/Contents/MacOS"
 mkdir -p "${APP_BUNDLE}/Contents/Resources"

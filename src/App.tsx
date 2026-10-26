@@ -396,6 +396,19 @@ export default function App() {
     useState<boolean>(false);
   const [isEventDetailsOpen, setIsEventDetailsOpen] = useState<boolean>(false);
   const [quickCopiedPrompt, setQuickCopiedPrompt] = useState<boolean>(false);
+  const [copiedBuildScript, setCopiedBuildScript] = useState<boolean>(false);
+
+  const handleCopySelfContainedDMGScript = useCallback(async () => {
+    try {
+      const res = await fetch('/Build-Pathfinder-Glass-DMG.command');
+      const text = await res.text();
+      await navigator.clipboard.writeText(text);
+      setCopiedBuildScript(true);
+      window.setTimeout(() => setCopiedBuildScript(false), 3000);
+    } catch {
+      setIsNativeXcodeOpen(true);
+    }
+  }, []);
 
   // Live Siri Dictation / Voice Auto-Follow State (Ephemeral 3-Beat Sliding Window: Previous, Current, Next)
   // Stores ZERO persistent word-position memory across the document: resets when switching lines.
@@ -700,6 +713,9 @@ export default function App() {
           }
         };
 
+        let lastResultIndex = -1;
+        let lastEvaluatedUnconsumed = '';
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recognition.onresult = (event: any) => {
           if (isCancelled) return;
@@ -710,6 +726,13 @@ export default function App() {
             typeof event.resultIndex === 'number'
               ? event.resultIndex
               : Math.max(0, event.results.length - 1);
+
+          if (activeResultIdx !== lastResultIndex) {
+            lastResultIndex = activeResultIdx;
+            beatBoundaryWordOffsetRef.current = 0;
+            latestRawResultWordCountRef.current = 0;
+            lastEvaluatedUnconsumed = '';
+          }
 
           let primaryCombined = '';
           const alt1Parts: string[] = [];
@@ -738,9 +761,20 @@ export default function App() {
             .filter(Boolean);
           latestRawResultWordCountRef.current = allPrimaryTokens.length;
 
-          // If a beat transition happened mid-result, reset offset if a new resultIndex started
+          // If interim hypothesis merged two words (e.g. "going to" -> "gonna"), clamp to end instead of resetting to 0
           if (allPrimaryTokens.length < beatBoundaryWordOffsetRef.current) {
-            beatBoundaryWordOffsetRef.current = 0;
+            beatBoundaryWordOffsetRef.current = Math.max(
+              0,
+              allPrimaryTokens.length - 1
+            );
+          }
+
+          // Cap unconsumed sliding window to 16 words so long continuous speech never overloads the matcher
+          if (
+            allPrimaryTokens.length - beatBoundaryWordOffsetRef.current >
+            16
+          ) {
+            beatBoundaryWordOffsetRef.current = allPrimaryTokens.length - 16;
           }
 
           const unconsumedPrimary = allPrimaryTokens
@@ -772,7 +806,11 @@ export default function App() {
             alternatives.push(alt2Joined);
           }
 
-          if (unconsumedPrimary) {
+          if (
+            unconsumedPrimary &&
+            unconsumedPrimary !== lastEvaluatedUnconsumed
+          ) {
+            lastEvaluatedUnconsumed = unconsumedPrimary;
             processLiveSpeechTranscript(unconsumedPrimary, alternatives);
           }
         };
@@ -1954,11 +1992,30 @@ export default function App() {
             </span>
           </button>
 
+          <button
+            type="button"
+            onClick={handleCopySelfContainedDMGScript}
+            title="Copies the entire self-contained macOS build script to clipboard — just paste (⌘V) in Terminal and press Return!"
+            className="apple-glass-btn-prominent inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-white text-[11px] font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            {copiedBuildScript ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Copied! Paste in Terminal</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Terminal Builder</span>
+              </>
+            )}
+          </button>
+
           <a
             href="/Build-Pathfinder-Glass-DMG.command"
-            download="Build-CueGlass-Studio-DMG.command"
+            download="Build-Pathfinder-Glass-DMG.command"
             title="Download self-contained macOS .command file that automatically builds Release .app and exports the installable .dmg"
-            className="apple-glass-btn-prominent inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-white text-[11px] font-semibold transition-all whitespace-nowrap shrink-0"
+            className="apple-glass-btn-dark inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-white text-[11px] font-semibold transition-all whitespace-nowrap shrink-0"
           >
             <span>Download .command</span>
           </a>

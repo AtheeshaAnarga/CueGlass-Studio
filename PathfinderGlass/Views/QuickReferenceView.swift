@@ -17,60 +17,105 @@ public struct QuickReferenceView: View {
         settings.themeMode == .dark
     }
 
-    public var body: some View {
-        AppleLiquidGlassContainer(spacing: 8) {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("Reference Tool", selection: $selectedTab) {
-                    Text("10 Backup Lines").tag(0)
-                    Text("11 Questions").tag(1)
-                    Text("12 Checklist").tag(2)
-                }
-                .pickerStyle(.segmented)
+    private var isFullLiquid: Bool {
+        settings.windowLayoutMode == .fullLiquidGlass
+    }
 
-                if selectedTab != 2 {
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Custom Tahoe Liquid Glass Pill Tab Selector (replaces stock Picker(.segmented))
+            HStack(spacing: 6) {
+                Button {
+                    selectedTab = 0
+                } label: {
+                    Text("10 Backup Lines")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .appleLiquidGlassButton(prominent: selectedTab == 0, isDark: isDark, isFullLiquid: isFullLiquid)
+
+                Button {
+                    selectedTab = 1
+                } label: {
+                    Text("11 Questions")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .appleLiquidGlassButton(prominent: selectedTab == 1, isDark: isDark, isFullLiquid: isFullLiquid)
+
+                Button {
+                    selectedTab = 2
+                } label: {
+                    Text("12 Checklist")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .appleLiquidGlassButton(prominent: selectedTab == 2, isDark: isDark, isFullLiquid: isFullLiquid)
+            }
+
+            if selectedTab != 2 {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(.secondary)
                     TextField("Filter lines…", text: $filterText)
                         .textFieldStyle(.plain)
-                        .padding(8)
-                        .modifier(
-                            AppleLiquidGlassSurfaceModifier(
-                                cornerRadius: 99,
-                                isCapsule: true,
-                                variant: settings.glassVariant,
-                                tintColor: nil,
-                                interactive: true,
-                                isDark: isDark,
-                                liquidness: settings.liquidness
-                            )
-                        )
+                        .font(.system(size: 12))
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .modifier(
+                    AppleLiquidGlassSurfaceModifier(
+                        cornerRadius: 99,
+                        isCapsule: true,
+                        variant: settings.glassVariant,
+                        tintColor: nil,
+                        interactive: true,
+                        isDark: isDark,
+                        liquidness: settings.liquidness,
+                        isFullLiquid: isFullLiquid
+                    )
+                )
+            }
 
-                ScrollView {
-                    switch selectedTab {
-                    case 0:
-                        backupLinesList
-                    case 1:
-                        moderatorQuestionsList
-                    default:
-                        organizerChecklistView
-                    }
-                }
-                .frame(maxHeight: 340)
-
-                if navigation.activeOnDemandSnippet != nil {
-                    Button {
-                        navigation.returnToLivePosition()
-                        coordinator.isToolsPopoverOpen = false
-                    } label: {
-                        Label("Back to Last Live Beat", systemImage: "arrow.uturn.backward")
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .appleLiquidGlassButton(prominent: true, isDark: isDark)
+            ScrollView {
+                switch selectedTab {
+                case 0:
+                    backupLinesList
+                case 1:
+                    moderatorQuestionsList
+                default:
+                    organizerChecklistView
                 }
             }
-            .padding(12)
-            .frame(width: 380)
+            .frame(maxHeight: 330)
+
+            if navigation.activeOnDemandSnippet != nil {
+                Button {
+                    navigation.returnToLivePosition()
+                    coordinator.isToolsPopoverOpen = false
+                } label: {
+                    Label("Back to Last Live Beat", systemImage: "arrow.uturn.backward")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .appleLiquidGlassButton(prominent: true, isDark: isDark, isFullLiquid: isFullLiquid)
+            }
         }
+        .padding(14)
+        .frame(width: 370)
+        .modifier(
+            LiquidGlassBackgroundModifier(
+                cornerRadius: 18,
+                themeMode: settings.themeMode,
+                layoutMode: settings.windowLayoutMode,
+                variant: .regular,
+                tintPreset: settings.glassTintPreset,
+                liquidness: settings.liquidness,
+                transparency: 20,
+                glassEffectLevel: 95
+            )
+        )
     }
 
     private var backupLinesList: some View {
@@ -88,7 +133,11 @@ public struct QuickReferenceView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(snippet.title)
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color(red: 0.14, green: 0.39, blue: 0.85))
+                            .foregroundColor(
+                                isDark
+                                    ? Color(red: 0.38, green: 0.72, blue: 0.98)
+                                    : Color(red: 0.137, green: 0.388, blue: 0.851)
+                            )
                         if let first = snippet.spokenLines.first {
                             Text(first)
                                 .font(.system(size: 12))
@@ -97,7 +146,7 @@ public struct QuickReferenceView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .appleLiquidGlassButton(prominent: false, isDark: isDark)
+                .appleLiquidGlassButton(prominent: false, isDark: isDark, isFullLiquid: isFullLiquid)
             }
         }
     }
@@ -125,7 +174,7 @@ public struct QuickReferenceView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .appleLiquidGlassButton(prominent: false, isDark: isDark)
+                .appleLiquidGlassButton(prominent: false, isDark: isDark, isFullLiquid: isFullLiquid)
             }
         }
     }
@@ -147,7 +196,7 @@ public struct QuickReferenceView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .appleLiquidGlassButton(prominent: false, isDark: isDark)
+                .appleLiquidGlassButton(prominent: false, isDark: isDark, isFullLiquid: isFullLiquid)
             }
         }
     }

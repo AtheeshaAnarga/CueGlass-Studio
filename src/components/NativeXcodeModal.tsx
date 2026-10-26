@@ -46,15 +46,51 @@ const NATIVE_FILES_MANIFEST = [
 
 export const NativeXcodeModal: React.FC<NativeXcodeModalProps> = ({ onClose }) => {
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [copiedSelfContained, setCopiedSelfContained] = useState(false);
 
-  const macBuildCommands = `chmod +x ~/Downloads/Build-Pathfinder-Glass-DMG.command
-xattr -d com.apple.quarantine ~/Downloads/Build-Pathfinder-Glass-DMG.command 2>/dev/null || true
-~/Downloads/Build-Pathfinder-Glass-DMG.command`;
+  const macBuildCommands = `cd ~/Downloads
+if [ -f "Build-Pathfinder-Glass-DMG.command" ]; then
+  chmod +x Build-Pathfinder-Glass-DMG.command
+  xattr -d com.apple.quarantine Build-Pathfinder-Glass-DMG.command 2>/dev/null || true
+  ./Build-Pathfinder-Glass-DMG.command
+elif [ -f "Build-CueGlass-Studio-DMG.command" ]; then
+  chmod +x Build-CueGlass-Studio-DMG.command
+  xattr -d com.apple.quarantine Build-CueGlass-Studio-DMG.command 2>/dev/null || true
+  ./Build-CueGlass-Studio-DMG.command
+elif [ -f "PathfinderGlass-macOS-Xcode-Source.tar.gz" ]; then
+  rm -rf pathfinder-glass && mkdir -p pathfinder-glass
+  tar -xzf PathfinderGlass-macOS-Xcode-Source.tar.gz -C pathfinder-glass
+  cd pathfinder-glass
+  chmod +x build-release.sh package-dmg.sh Build-and-Export-DMG.command
+  ./package-dmg.sh
+  open "dist/Pathfinder Glass.app"
+elif [ -f "PathfinderGlass-macOS-Xcode-Source.tar" ]; then
+  rm -rf pathfinder-glass && mkdir -p pathfinder-glass
+  tar -xf PathfinderGlass-macOS-Xcode-Source.tar -C pathfinder-glass
+  cd pathfinder-glass
+  chmod +x build-release.sh package-dmg.sh Build-and-Export-DMG.command
+  ./package-dmg.sh
+  open "dist/Pathfinder Glass.app"
+else
+  echo "⚠️ Click 'Copy Terminal Builder' or 'Download .command' in the top bar of AI Studio first!"
+fi`;
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(macBuildCommands);
     setCopiedCmd(true);
     setTimeout(() => setCopiedCmd(false), 2000);
+  };
+
+  const handleCopySelfContainedScript = async () => {
+    try {
+      const res = await fetch('/Build-Pathfinder-Glass-DMG.command');
+      const scriptText = await res.text();
+      await navigator.clipboard.writeText(scriptText);
+      setCopiedSelfContained(true);
+      setTimeout(() => setCopiedSelfContained(false), 3000);
+    } catch {
+      handleCopy();
+    }
   };
 
   return (
@@ -92,37 +128,67 @@ xattr -d com.apple.quarantine ~/Downloads/Build-Pathfinder-Glass-DMG.command 2>/
         </div>
 
         <div className="pg-scroll overflow-y-auto p-5 space-y-5 bg-white/25">
-          {/* Primary: Direct Self-Contained .command File */}
-          <div className="p-4 rounded-2xl apple-glass-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Option 1: Zero-Download Clipboard Paste Builder */}
+          <div className="p-4 rounded-2xl apple-glass-card border-2 border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-950">
-                <Play className="w-4 h-4 text-emerald-600 fill-emerald-600" />
-                <span>Direct `.command` Auto-Builder &amp; DMG Exporter (Recommended)</span>
+                <Terminal className="w-4 h-4 text-emerald-600" />
+                <span>Option A — Copy Full Self-Contained Build Script (No File Download Needed)</span>
               </div>
               <p className="text-xs text-slate-700">
-                Self-contained single file (<code className="font-mono-tabular font-semibold">Build-Pathfinder-Glass-DMG.command</code>). Unpacks the Swift 6 source adopting Apple&apos;s official macOS 26 Tahoe Liquid Glass APIs, compiles the Release <code className="font-mono-tabular">.app</code>, and exports the shareable <code className="font-mono-tabular">.dmg</code>.
+                Copies the entire self-contained installer + Swift source archive directly to your clipboard. Just click this button, switch to macOS Terminal, press <code className="font-mono-tabular font-semibold">⌘V</code> and hit <code className="font-mono-tabular font-semibold">Return</code>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopySelfContainedScript}
+              className="apple-glass-btn-prominent inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              {copiedSelfContained ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Copied! Paste (⌘V) in Terminal</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>Copy Full Build Script</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Option 2: Direct Self-Contained .command File */}
+          <div className="p-4 rounded-2xl apple-glass-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                <Play className="w-4 h-4 text-[#2363D9] fill-[#2363D9]" />
+                <span>Option B — Download `.command` Auto-Builder &amp; DMG Exporter</span>
+              </div>
+              <p className="text-xs text-slate-700">
+                Downloads <code className="font-mono-tabular font-semibold">Build-Pathfinder-Glass-DMG.command</code> to <code className="font-mono-tabular">~/Downloads</code>. Unpacks the Swift source, compiles <code className="font-mono-tabular">Pathfinder Glass.app</code>, and builds <code className="font-mono-tabular">Pathfinder-Glass-macOS.dmg</code>.
               </p>
             </div>
             <a
               href="/Build-Pathfinder-Glass-DMG.command"
               download="Build-Pathfinder-Glass-DMG.command"
-              className="apple-glass-btn-prominent inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold whitespace-nowrap shrink-0"
+              className="apple-glass-btn inline-flex items-center gap-2 px-4 py-2.5 text-slate-900 text-xs font-semibold whitespace-nowrap shrink-0"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4 text-[#2363D9]" />
               <span>Download .command Builder</span>
             </a>
           </div>
 
-          {/* Secondary: Full tar.gz archive */}
+          {/* Option 3: Full tar.gz archive */}
           <div className="p-4 rounded-2xl apple-glass-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="text-sm font-bold text-[#11141C]">
-                Download Complete Native Xcode &amp; SwiftPM Archive (.tar.gz)
+                Option C — Download Complete Native Xcode &amp; SwiftPM Archive (.tar.gz)
               </div>
               <p className="text-xs text-slate-600">
                 Contains <code className="font-mono-tabular">Build-and-Export-DMG.command</code>,{' '}
-                <code className="font-mono-tabular">PathfinderGlass.xcodeproj</code>,{' '}
-                <code className="font-mono-tabular">Package.swift</code>, and all Swift 6 source &amp; XCTest files.
+                <code className="font-mono-tabular">package-dmg.sh</code>,{' '}
+                <code className="font-mono-tabular">Package.swift</code>, and all Swift source &amp; XCTest files.
               </p>
             </div>
             <a
@@ -140,7 +206,7 @@ xattr -d com.apple.quarantine ~/Downloads/Build-Pathfinder-Glass-DMG.command 2>/
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                 <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                Run Downloaded .command File (or Double-Click in Finder after chmod +x)
+                If using Option B or C (Downloaded to ~/Downloads), run this in Terminal:
               </span>
               <button
                 type="button"

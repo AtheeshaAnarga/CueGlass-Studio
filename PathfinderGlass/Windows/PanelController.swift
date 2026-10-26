@@ -53,8 +53,8 @@ public final class PanelController: NSObject, NSWindowDelegate {
         syncThemeAppearance(coordinator.settings.themeMode)
     }
 
-    /// Instantiates Apple's official macOS 26 Tahoe `NSGlassEffectView` (`https://developer.apple.com/documentation/appkit/nsglasseffectview`)
-    /// and embeds `hostingView` via `.contentView = hostingView`, with automatic runtime lookup so it works even if compiled with Xcode 16 CLI tools on macOS Tahoe.
+    /// Creates a consistent behind-window optical blur host view so the custom SwiftUI
+    /// Tahoe Liquid Glass gradients, specular borders, and card surfaces match the AI Studio design identically.
     private static func makeOfficialTahoeGlassRootView(
         frame: NSRect,
         hostingView: NSView,
@@ -62,30 +62,6 @@ public final class PanelController: NSObject, NSWindowDelegate {
         settings: SettingsStore
     ) -> NSView {
         let isDark = (settings.themeMode == .dark)
-        let tint = settings.glassTintPreset.nsColor(isDark: isDark, transparency: settings.glassTransparency)
-
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) {
-            let glassView = NSGlassEffectView(frame: frame)
-            glassView.autoresizingMask = [.width, .height]
-            glassView.cornerRadius = cornerRadius
-            glassView.tintColor = tint
-            glassView.contentView = hostingView
-            return glassView
-        }
-        #endif
-
-        // Dynamic runtime bridge for macOS 26 Tahoe when built via earlier Command Line Tools SDK
-        if let glassClass = NSClassFromString("NSGlassEffectView") as? NSView.Type {
-            let glassView = glassClass.init(frame: frame)
-            glassView.autoresizingMask = [.width, .height]
-            glassView.setValue(cornerRadius, forKey: "cornerRadius")
-            glassView.setValue(tint, forKey: "tintColor")
-            glassView.setValue(hostingView, forKey: "contentView")
-            return glassView
-        }
-
-        // Pre-Tahoe fallback (macOS 15 Sequoia)
         let effectView = NSVisualEffectView(frame: frame)
         effectView.blendingMode = .behindWindow
         effectView.state = .active
@@ -110,27 +86,8 @@ public final class PanelController: NSObject, NSWindowDelegate {
     public func syncGlassMaterialProperties() {
         guard let rootGlassHostView = rootGlassHostView else { return }
         let isBubble = coordinator.settings.isCollapsedToBubble
-        let cornerRadius: CGFloat = isBubble ? 23.0 : 22.0
+        let cornerRadius: CGFloat = isBubble ? 23.0 : 24.0
         let isDark = (coordinator.settings.themeMode == .dark)
-        let tint = coordinator.settings.glassTintPreset.nsColor(
-            isDark: isDark,
-            transparency: coordinator.settings.glassTransparency
-        )
-
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *), let glassView = rootGlassHostView as? NSGlassEffectView {
-            glassView.cornerRadius = cornerRadius
-            glassView.tintColor = tint
-            return
-        }
-        #endif
-
-        if NSClassFromString("NSGlassEffectView") != nil,
-           rootGlassHostView.isKind(of: NSClassFromString("NSGlassEffectView")!) {
-            rootGlassHostView.setValue(cornerRadius, forKey: "cornerRadius")
-            rootGlassHostView.setValue(tint, forKey: "tintColor")
-            return
-        }
 
         if let effectView = rootGlassHostView as? NSVisualEffectView {
             let targetMaterial: NSVisualEffectView.Material = isDark ? .hudWindow : .popover

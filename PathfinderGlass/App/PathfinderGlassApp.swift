@@ -157,7 +157,7 @@ public final class PathfinderAppDelegate: NSObject, NSApplicationDelegate, NSMen
         if coordinator.settings.isCollapsedToBubble {
             coordinator.toggleCollapse()
         }
-        coordinator.isPreflightSheetOpen = true
+        coordinator.openPreflightWindow()
         coordinator.panelController?.showPanel()
     }
 
@@ -169,7 +169,7 @@ public final class PathfinderAppDelegate: NSObject, NSApplicationDelegate, NSMen
         if coordinator.settings.isCollapsedToBubble {
             coordinator.toggleCollapse()
         }
-        coordinator.isCheatSheetOpen = true
+        coordinator.openSettingsWindow()
         coordinator.panelController?.showPanel()
     }
 
